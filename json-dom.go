@@ -199,7 +199,7 @@ func main() {
 			filesPtr := element["files"].(*Files)
 			inputPtr := element["input"].(*string)
 
-			if len(*filesPtr) != 0 && *inputPtr != "" {
+			if len(*filesPtr) != 0 || *inputPtr != "" {
 				var data []byte
 
 				// If both a file and a stdin input is given then evaluate the files first
