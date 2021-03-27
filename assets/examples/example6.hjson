@@ -1,9 +1,13 @@
 {
     // Tests scripts at different depths
     attrs: {
-        // No script in 'ere
         height_metres: 1.8
         shoe_size: 8
+        clown_shoe:
+            '''#//!js
+            // This won't be run because outer scope deletes this key
+            json['clown_shoe_size'] = json.shoe_size + 3
+            '''
     },
     person: {
         name: John Smith
@@ -45,12 +49,8 @@
             }
         ]
     },
-    seren-scrippidy:
+    delete_attrs:
         '''#//!js
-        // Replaces person.name with two other fields: first_name and last_name
-        var first_last = json.person.name.split(' ');
-        json['person']['first_name'] = first_last[0];
-        json['person']['last_name'] = first_last[1];
-        delete json.person.name;
+        delete json.attrs
         '''
 }

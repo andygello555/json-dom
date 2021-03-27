@@ -21,8 +21,8 @@
                     evil: true
                     script:
                         '''#//!js
-                        for (let i=0; i<10; i++) {
-                            json['Meow'] = 'Purr';
+                        for (var i=0; i<10; i++) {
+                            json['Meow' + i] = 'Purr';
                         }
                         '''
                 }
@@ -39,8 +39,8 @@
                     // Lone script field
                     script:
                         '''#//!js
-                        for (let i=0; i<10; i++) {
-                            json['Woof'] = 'Bark';
+                        for (var i=0; i<10; i++) {
+                            json['Woof' + i] = 'Bark';
                         }
                         '''
                 }
@@ -57,7 +57,7 @@
     seren-scrippidy:
         '''#//!js
         // Replaces person.name with two other fields: first_name and last_name
-        let first_last = json.person.name.split(' ')[0];
+        var first_last = json.person.name.split(' ');
         json['person']['first_name'] = first_last[0];
         json['person']['last_name'] = first_last[1];
         delete json.person.name;

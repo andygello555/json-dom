@@ -11,46 +11,6 @@ import (
 	"unicode/utf8"
 )
 
-const KeyValuePairDelim = ':'
-
-// CliError type for handling errors
-type CliError struct {
-	code int	    // The return code
-	internal bool   // Whether or not the error is internal or down to user input
-	message string  // The message to print along with the err message if given
-}
-
-var (
-	ParseErr            = CliError{1, true, "Parse error has occurred"}
-	FormatErr           = CliError{2, true, "Format error has occurred"}
-	ReadFileErr			= CliError{3, true, "A read file error occurred"}
-	KeyValueErr         = CliError{4, false, "Error while handling Key Value flag"}
-	SubcommandErr       = CliError{5, false, "Subcommand not given/not recognised"}
-	RequiredFlagErr     = CliError{6, false, "The following required flag was not given"}
-	FileDoesNotExistErr = CliError{7, false, "The following file does not exist and cannot be read"}
-	EvaluationErr		= CliError{8, false, "The following error occurred while evaluating a json-dom object"}
-)
-
-func (e *CliError) Handle(err error, flagSetArray ...*flag.FlagSet) {
-	if err != nil {
-		fmt.Println(e.message + ":", err)
-	} else {
-		fmt.Println(e.message)
-	}
-
-	// PrintDefaults if not an internal error
-	if !e.internal {
-		if len(flagSetArray) == 0 {
-			flag.PrintDefaults()
-		} else {
-			flagSetArray[0].PrintDefaults()
-		}
-	}
-
-	// Finally exit, returning the exit code to the shell
-	os.Exit(e.code)
-}
-
 type Subcommands map[string]map[string]interface{}
 
 // Flag Type for a list of Files
@@ -63,7 +23,6 @@ func (s *Files) String() string {
 
 // Sets the value of the Files flag
 func (s *Files) Set(value string) error {
-	fmt.Println(value)
 	*s = strings.Split(value, ",")
 	return nil
 }
@@ -76,9 +35,9 @@ func (kvp *KeyValuePair) String() string {
 	// a=b, c=d, ...
 	var b strings.Builder
 	for key, element := range *kvp {
-		_, err := fmt.Fprintf(&b, "%v%v%v,", key, KeyValuePairDelim, element)
+		_, err := fmt.Fprintf(&b, "%v%v%v,", key, utils.KeyValuePairDelim, element)
 		if err != nil {
-			FormatErr.Handle(err)
+			utils.FormatErr.Handle(err)
 		}
 	}
 
@@ -96,14 +55,14 @@ func (kvp *KeyValuePair) Set(value string) error {
 	keyVals := strings.Split(value, ",")
 	*kvp = make(KeyValuePair)
 	for _, keyVal := range keyVals {
-		keyValArray := strings.Split(keyVal, string(KeyValuePairDelim))
+		keyValArray := strings.Split(keyVal, string(utils.KeyValuePairDelim))
 		// Throw an error if len is 0, aka: string is "="
 		if len(keyValArray) == 0 {
-			return errors.New(fmt.Sprintf("%v is not a pair (syntax is 'key%vvalue')", keyVal, KeyValuePairDelim))
+			return errors.New(fmt.Sprintf("%v is not a pair (syntax is 'key%vvalue')", keyVal, utils.KeyValuePairDelim))
 		}
 		// Throw error if there is more than one delim in the string
 		if len(keyValArray) > 2 {
-			return errors.New(fmt.Sprintf("%v is not a pair (must only be a single %v char)", keyVal, KeyValuePairDelim))
+			return errors.New(fmt.Sprintf("%v is not a pair (must only be a single %v char)", keyVal, utils.KeyValuePairDelim))
 		}
 
 		if len(keyValArray) == 1 {
@@ -148,7 +107,7 @@ func main() {
 
 	// Verify a subcommand has been given
 	if len(os.Args) < 2 {
-		SubcommandErr.Handle(nil)
+		utils.SubcommandErr.Handle(nil)
 	}
 
 	var parseErr error
@@ -160,12 +119,12 @@ func main() {
 		flagSet := subcommandMap[os.Args[1]]["flagSet"].(*flag.FlagSet)
 		parseErr = flagSet.Parse(flags)
 	default:
-		SubcommandErr.Handle(nil)
+		utils.SubcommandErr.Handle(nil)
 	}
 
 	// Handle any parse errors
 	if parseErr != nil {
-		ParseErr.Handle(parseErr)
+		utils.ParseErr.Handle(parseErr)
 	}
 
 	// Check which subcommand was parsed and handle it
@@ -222,14 +181,14 @@ func main() {
 
 						// Throw an error if a file doesn't exist
 						if !exists {
-							FileDoesNotExistErr.Handle(errors.New(file))
+							utils.FileDoesNotExistErr.Handle(errors.New(file))
 						}
 
 						// Read the file
 						var err error
 						data, err = ioutil.ReadFile(file)
 						if err != nil {
-							ReadFileErr.Handle(err)
+							utils.ReadFileErr.Handle(err)
 						}
 					}
 				} else {
@@ -238,21 +197,20 @@ func main() {
 				}
 
 				// Evaluate the json-dom object
-				eval, err := Eval(data)
+				eval, err := Eval(data, verbose)
 				if err != nil {
-					EvaluationErr.Handle(err)
+					utils.EvaluationErr.Handle(err)
 				}
 
 				// TODO: This is where saving to a destination file would come in
-				fmt.Println()
-				fmt.Println("CLI main:", eval)
+				fmt.Println(string(eval))
 			} else {
 				// Files and input not given so throw RequiredFlagErr
-				RequiredFlagErr.Handle(errors.New("files or input (one of these must be given)"),
+				utils.RequiredFlagErr.Handle(errors.New("files or input (one of these must be given)"),
 					element["flagSet"].(*flag.FlagSet))
 			}
 			os.Exit(0)
 		}
 	}
-	ParseErr.Handle(nil)
+	utils.ParseErr.Handle(nil)
 }

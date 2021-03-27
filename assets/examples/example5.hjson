@@ -30,8 +30,8 @@
                     // Lone script field
                     script:
                         '''#//!js
-                        for (let i=0; i<10; i++) {
-                            json['Woof'] = 'Bark';
+                        for (var i=0; i<10; i++) {
+                            json['Woof' + i] = 'Bark';
                         }
                         '''
                 }

@@ -1,0 +1,31 @@
+{
+    // Demonstrate how multiple scripts on the same level are executed lexicographically.
+    // Counter should be evaluated as 9.
+    counter: 0,
+    nested_boi: {
+        script:
+            '''#//!js
+            json['Hello'] = "World";
+            '''
+    }
+    d:
+        '''#//!js
+        json['counter'] *= 3;
+        '''
+    a:
+        '''#//!js
+        json['counter'] += 6;
+        '''
+    c:
+        '''#//!js
+        json['counter'] /= 2;
+        '''
+    b:
+        '''#//!js
+        json['counter'] -= 4;
+        '''
+    e:
+        '''#//!js
+        json['counter'] *= 3;
+        '''
+}
