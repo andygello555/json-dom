@@ -1,0 +1,40 @@
+{
+    people: [
+        {
+            name: Jessica Day
+            attrs: [
+                "Bug eyes",
+                "Black hair"
+            ],
+            script:
+                '''#//!js
+                // This JOM is scoped to just this object
+                json.attrs.push('Married to Nick Miller (spoilers)')
+                '''
+        },
+        {
+            name: Nick Miller
+            attrs: [
+                "Heavy drinker",
+                "Writer"
+            ],
+            script:
+                '''#//!js
+                // ... same with this one
+                json.attrs.push('Married to Jessica Day (spoilers)')
+                '''
+        }
+    ]
+    // Script keys don't need to be named 'script'
+    scrippidy_script:
+        '''#//!js
+        // This JOM is scoped to the entire JSON
+        json.people.push({
+            name: "Winston Bishop",
+            attrs: [
+                "Ferguson",
+                "Married to Ally (spoilers)"
+            ]
+        })
+        '''
+}
