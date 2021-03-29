@@ -7,7 +7,7 @@
         script:
             '''#//!js
             // JSON object only has a scope of the current object
-            printlnExternal(json)
+            console.log(json);
             json['age'] = 18
             '''
         pets: [
@@ -42,7 +42,8 @@
         // Replaces person.name with two other fields: first_name and last_name
         var first_last = json.person.name.split(' ');
         // Built in function to print out some debugging info
-        printlnExternal(first_last)
+        console.log(first_last);
+        console.error(first_last);
         json['person']['first_name'] = first_last[0];
         json['person']['last_name'] = first_last[1];
         delete json.person.name;

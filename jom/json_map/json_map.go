@@ -7,5 +7,7 @@ type JsonMapInt interface {
 	FindScriptFields() (found bool)
 	GetCurrentScopePath() string
 	GetInsides() *map[string]interface{}
+	Marshal() (out []byte, err error)
 	Run()
+	Unmarshal(jsonBytes []byte) (err error)
 }

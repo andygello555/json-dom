@@ -6,13 +6,13 @@ import (
 	"github.com/andygello555/json-dom/jom/json_map"
 	"github.com/andygello555/json-dom/utils"
 	"github.com/robertkrimen/otto"
-	"log"
+	"os"
 	"strings"
 	"time"
 )
 
 // Used to map a JS Object from Otto into a map so that it can be used
-func TraverseObject(object *otto.Object) *map[string]interface{} {
+func traverseObject(object *otto.Object) *map[string]interface{} {
 	objectMap := make(map[string]interface{})
 
 	for _, key := range object.Keys() {
@@ -40,7 +40,7 @@ func TraverseObject(object *otto.Object) *map[string]interface{} {
 			realVal = boolean
 		} else if val.IsObject() {
 			obj := val.Object()
-			objectMapInner := TraverseObject(obj)
+			objectMapInner := traverseObject(obj)
 			realVal = *objectMapInner
 		}
 		objectMap[key] = realVal
@@ -48,10 +48,22 @@ func TraverseObject(object *otto.Object) *map[string]interface{} {
 	return &objectMap
 }
 
-// Callback for printing within the JS environment
-func PrintlnExternal(call otto.FunctionCall) otto.Value {
+// Composes a string to print from the given otto.FunctionCall
+func composePrint(call otto.FunctionCall) *strings.Builder {
 	// Print the caller location
-	fmt.Println("PrintlnExternal call from:", call.CallerLocation())
+	var out strings.Builder
+	var callLocation string
+
+	if get, err := call.Otto.Get("__scopePath__"); err != nil {
+		callLocation = "__scopePath__ not found"
+	} else {
+		// Check if __scopePath__ is not a string (it has been overridden by user)
+		if !get.IsString() {
+			panic(utils.OverriddenBuiltin.FillError("__scopePath__"))
+		}
+		callLocation = fmt.Sprintf("<%s>", get.String())
+	}
+	_, _ = fmt.Fprintln(&out, "call from:", strings.Replace(call.CallerLocation(), "<anonymous>", callLocation, -1))
 	var b strings.Builder
 	argList := call.ArgumentList
 
@@ -75,7 +87,7 @@ func PrintlnExternal(call otto.FunctionCall) otto.Value {
 				_, _ = fmt.Fprintf(&b, "%g", float)
 			} else if arg.IsObject() {
 				obj := arg.Object()
-				objMap := TraverseObject(obj)
+				objMap := traverseObject(obj)
 				_, _ = fmt.Fprintf(&b, "%v", *objMap)
 			} else {
 				class := arg.Class()
@@ -90,8 +102,12 @@ func PrintlnExternal(call otto.FunctionCall) otto.Value {
 			_, _ = fmt.Fprint(&b, " ")
 		}
 	}
-	fmt.Println("\t", b.String())
-	return otto.Value{}
+
+	// Tabulate all lines that are being output and write them to out
+	for _, line := range strings.Split(b.String(), "\n") {
+		_, _ = fmt.Fprintf(&out, "\t%s\n", line)
+	}
+	return &out
 }
 
 // Struct representing a builtin function that can be called from within the JS environment
@@ -108,7 +124,11 @@ type BuiltinVar struct {
 
 // Construct a list of all the builtin functions to register when creating the environment
 var builtinFuncs = []BuiltinFunc{
-	{"printlnExternal", PrintlnExternal},
+	// printlnExternal is a legacy version of the console.log
+	{"printlnExternal", func(call otto.FunctionCall) otto.Value {
+		fmt.Printf("Print %s\n", composePrint(call))
+		return otto.NullValue()
+	}},
 }
 
 var builtinVars = []BuiltinVar{
@@ -118,6 +138,27 @@ var builtinVars = []BuiltinVar{
 		}
 		// Panic if we can't assert the given arg into a JsonMapInt
 		panic(utils.BuiltinGetterError.FillError("__scopePath__", fmt.Sprintf("Could not assert %v into JsonMapInt", i[0])))
+	}},
+	{"console", func(i ...interface{}) interface{} {
+		// Sets up the console object
+		runtime := i[0].(*otto.Otto)
+		consoleObj := map[string]interface{} {
+			"log": func(call otto.FunctionCall)otto.Value {
+				fmt.Printf("Print %s\n", composePrint(call))
+				return otto.NullValue()
+			},
+			"error": func(call otto.FunctionCall)otto.Value {
+				// Redirect to stderr
+				_, _ = fmt.Fprintf(os.Stderr, "Error %s\n", composePrint(call))
+				return otto.NullValue()
+			},
+		}
+		if val, err := runtime.ToValue(consoleObj); err != nil {
+			panic(err)
+			//panic(utils.BuiltinGetterError.FillError("console", "Could not convert console obj to otto.Value"))
+		} else {
+			return val
+		}
 	}},
 }
 
@@ -192,13 +233,18 @@ func RunScript(script string, jsonMap json_map.JsonMapInt) (data json_map.JsonMa
 		}
 	}
 	for _, builtin := range builtinVars {
+		var err error
 		switch builtin.name {
 		case "__scopePath__":
-			if err := vm.Set(builtin.name, builtin.getter(jsonMap)); err != nil {
-				panic(err)
-			}
+			err = vm.Set(builtin.name, builtin.getter(jsonMap))
+		case "console":
+			err = vm.Set(builtin.name, builtin.getter(vm))
 		default:
-			log.Fatal("Could not assign builtin variable: " + builtin.name)
+			err = vm.Set(builtin.name, builtin.getter())
+		}
+		// Panic if there was an error
+		if err != nil {
+			panic(err)
 		}
 	}
 

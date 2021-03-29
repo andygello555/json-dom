@@ -281,20 +281,13 @@ func (jsonMap *JsonMap) Run() {
 	}
 }
 
-// Evaluates the scripts within a given hjson byte array.
-// Should really only be called from within CLI main.
-// Returns the evaluated JSON as a byte array and nil if everything is good. Otherwise an empty byte array and an error
-// will be returned if an error occurs.
-func Eval(jsonBytes []byte, verbose bool) (out []byte, err error) {
-	// Create map to keep decoded data
-	jsonMap := New()
-	array := false
-
+// Unmarshal a hjson byte string and package it as a JsonMap.
+func (jsonMap *JsonMap) Unmarshal(jsonBytes []byte) (err error) {
 	// Decode and a check for errors.
 	if err = hjson.Unmarshal(jsonBytes, &jsonMap.insides); err != nil {
 		// FIXME Find a better way of handling JSON with an array at their root
 		if strings.Contains(err.Error(), "value of type []interface {} is not assignable to type map[string]interface {}") {
-			array = true
+			jsonMap.array = true
 			// Create an "array" key within jsonMap.insides that will contain the unmarshalled array
 			// When Marshalling into JSON check if this hack was used and deal with it accordingly
 			var rootArray []interface{}
@@ -302,9 +295,37 @@ func Eval(jsonBytes []byte, verbose bool) (out []byte, err error) {
 				jsonMap.insides["array"] = rootArray
 			}
 		}
-		if !array {
-			return out, err
+		if !jsonMap.array {
+			return err
 		}
+	}
+	return nil
+}
+
+// Marshal a JsonMap back into JSON.
+func (jsonMap *JsonMap) Marshal() (out []byte, err error) {
+	// Marshal the output JSON
+	if !jsonMap.array {
+		out, err = json.Marshal(jsonMap.insides)
+	} else {
+		// Handle the root array hack
+		out, err = json.Marshal(jsonMap.insides["array"])
+	}
+	return out, err
+}
+
+// Evaluates the scripts within a given hjson byte array.
+// Should really only be called from within CLI main.
+// Returns the evaluated JSON as a byte array and nil if everything is good. Otherwise an empty byte array and an error
+// will be returned if an error occurs.
+func Eval(jsonBytes []byte, verbose bool) (out []byte, err error) {
+	// Create map to keep decoded data
+	jsonMap := New()
+
+	// Unmarshal into the JsonMap
+	err = jsonMap.Unmarshal(jsonBytes)
+	if err != nil {
+		return out, err
 	}
 
 	// Catch any panics that might happen when running scripts
@@ -324,12 +345,7 @@ func Eval(jsonBytes []byte, verbose bool) (out []byte, err error) {
 	}
 
 	// Marshal the output JSON
-	if !array {
-		out, err = json.Marshal(jsonMap.insides)
-	} else {
-		// Handle the root array hack
-		out, err = json.Marshal(jsonMap.insides["array"])
-	}
+	out, err = jsonMap.Marshal()
 	if err != nil {
 		return out, err
 	}

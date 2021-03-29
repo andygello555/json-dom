@@ -56,6 +56,7 @@ var (
 	HaltingProblem        = RuntimeError{-1, "Infinite loop has occurred after"}
 	UnsupportedScriptLang = RuntimeError{-2, "Script has an unsupported script language in the shebang line"}
 	BuiltinGetterError    = RuntimeError{-3, "An error has occurred when getting the value of a builtin variable"}
+	OverriddenBuiltin     = RuntimeError{-4, "The following builtin was overridden"}
 )
 
 // Fill out a RuntimeError error with the given extra info
