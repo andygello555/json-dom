@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/andygello555/json-dom/jom"
 	"github.com/andygello555/json-dom/utils"
 	"io/ioutil"
 	"os"
@@ -197,7 +198,7 @@ func main() {
 				}
 
 				// Evaluate the json-dom object
-				eval, err := Eval(data, verbose)
+				eval, err := jom.Eval(data, verbose)
 				if err != nil {
 					utils.EvaluationErr.Handle(err)
 				}

@@ -53,7 +53,9 @@ type RuntimeError struct {
 
 // Runtime errors (negative codes)
 var (
-	HaltingProblem = RuntimeError{-1,"Infinite loop has occurred after"}
+	HaltingProblem        = RuntimeError{-1, "Infinite loop has occurred after"}
+	UnsupportedScriptLang = RuntimeError{-2, "Script has an unsupported script language in the shebang line"}
+	BuiltinGetterError    = RuntimeError{-3, "An error has occurred when getting the value of a builtin variable"}
 )
 
 // Fill out a RuntimeError error with the given extra info

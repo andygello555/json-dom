@@ -4,13 +4,14 @@ import "time"
 
 const (
 	ShebangPrefix                 = "#//!"
-	ShebangLen					  = 4
+	ShebangLen					  = len(ShebangPrefix)
 	ShortestSupportedScriptTagLen = 2
 	LongestSupportedScriptTagLen  = 2
 	JOMVariableName				  = "json"
 	KeyValuePairDelim             = ':'
 	HaltingDelay				  = 4
 	HaltingDelayUnits			  = time.Second
+	ScriptErrorFormatString       = "script:\n```\n%s\n```"
 )
 
 // Gets a map of all the supported script shebang suffixes

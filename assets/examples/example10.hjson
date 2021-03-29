@@ -1,0 +1,6 @@
+{
+    no-supporty:
+        '''#//!py
+        json['python'] = 'Would be pretty cool tho'
+        '''
+}
