@@ -9,7 +9,7 @@
             script:
                 '''#//!js
                 // This JOM is scoped to just this object
-                json.attrs.push('Married to Nick Miller (spoilers)')
+                json.trail.attrs.push('Married to Nick Miller (spoilers)')
                 '''
         },
         {
@@ -21,7 +21,7 @@
             script:
                 '''#//!js
                 // ... same with this one
-                json.attrs.push('Married to Jessica Day (spoilers)')
+                json.trail.attrs.push('Married to Jessica Day (spoilers)')
                 '''
         }
     ]
@@ -29,7 +29,7 @@
     scrippidy_script:
         '''#//!js
         // This JOM is scoped to the entire JSON
-        json.people.push({
+        json.trail.people.push({
             name: "Winston Bishop",
             attrs: [
                 "Ferguson",

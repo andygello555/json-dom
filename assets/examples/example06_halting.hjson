@@ -5,7 +5,7 @@
         '''#//!js
         var i = 0;
         while (true) {
-            json[i] = i;
+            json.trail[i] = i;
         }
         '''
 }

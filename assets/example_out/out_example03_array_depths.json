@@ -1,0 +1,45 @@
+{
+  "attrs": {
+    "height_metres": 1.8,
+    "shoe_size": 8
+  },
+  "person": {
+    "age": 18,
+    "first_name": "John",
+    "last_name": "Smith",
+    "pets": [
+      "Dog",
+      {
+        "attrs": {
+          "cute": true,
+          "evil": true
+        },
+        "name": "Bojangles",
+        "type": "Cat"
+      },
+      {
+        "attrs": {
+          "Woof0": "Bark",
+          "Woof1": "Bark",
+          "Woof2": "Bark",
+          "Woof3": "Bark",
+          "Woof4": "Bark",
+          "Woof5": "Bark",
+          "Woof6": "Bark",
+          "Woof7": "Bark",
+          "Woof8": "Bark",
+          "Woof9": "Bark"
+        },
+        "name": "Red-beard",
+        "type": "Dog"
+      },
+      {
+        "attrs": {
+          "loud": true
+        },
+        "name": "Fiddle Sticks",
+        "type": "Parrot"
+      }
+    ]
+  }
+}

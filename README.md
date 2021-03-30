@@ -8,10 +8,10 @@ Embedded JSON manipulation using [Hjson](https://hjson.github.io/) and Go
     name: "John Smith",
     script:
         '''#//!js
-        var first_last = json.name.split(' ');
-        json['first_name'] = first_last[0];
-        json['last_name'] = first_last[1];
-        delete json.name;
+        var first_last = json.trail.name.split(' ');
+        json.trail['first_name'] = first_last[0];
+        json.trail['last_name'] = first_last[1];
+        delete json.trail.name;
         '''
 }
 ```
@@ -57,10 +57,10 @@ func main() {
         name: John Smith,
         script:
             '''#//!js
-            var first_last = json.name.split(' ');
-            json['first_name'] = first_last[0];
-            json['last_name'] = first_last[1];
-            delete json.name;
+            var first_last = json.trail.name.split(' ');
+            json.trail['first_name'] = first_last[0];
+            json.trail['last_name'] = first_last[1];
+            delete json.trail.name;
             '''
     }`)
 
@@ -102,7 +102,7 @@ Similar to DOM manipulation a builtin variable is parsed to all your scripts wit
             script:
                 '''#//!js
                 // This JOM is scoped to just this object
-                json.attrs.push('Married to Nick Miller (spoilers)')
+                json.trail.attrs.push('Married to Nick Miller (spoilers)')
                 '''
         },
         {
@@ -114,7 +114,7 @@ Similar to DOM manipulation a builtin variable is parsed to all your scripts wit
             script:
                 '''#//!js
                 // ... same with this one
-                json.attrs.push('Married to Jessica Day (spoilers)')
+                json.trail.attrs.push('Married to Jessica Day (spoilers)')
                 '''
         }
     ]
@@ -122,7 +122,7 @@ Similar to DOM manipulation a builtin variable is parsed to all your scripts wit
     scrippidy_script:
         '''#//!js
         // This JOM is scoped to the entire JSON
-        json.people.push({
+        json.trail.people.push({
             name: "Winston Bishop",
             attrs: [
                 "Ferguson",
@@ -177,28 +177,28 @@ Evaluates to...
     nested_boi: {
         script:
             '''#//!js
-            json['Hello'] = "World";
+            json.trail['Hello'] = "World";
             '''
     },
     d:
         '''#//!js
-        json['counter'] *= 3;
+        json.trail['counter'] *= 3;
         '''
     a:
         '''#//!js
-        json['counter'] += 6;
+        json.trail['counter'] += 6;
         '''
     c:
         '''#//!js
-        json['counter'] /= 2;
+        json.trail['counter'] /= 2;
         '''
     b:
         '''#//!js
-        json['counter'] -= 4;
+        json.trail['counter'] -= 4;
         '''
     e:
         '''#//!js
-        json['counter'] *= 3;
+        json.trail['counter'] *= 3;
         '''
 }
 ```
@@ -214,7 +214,9 @@ Will be evaluated as...
 }
 ```
 
-If there are multiple scripts on the same level of the scope then scripts will be run in **lexicographical script-key 
+The only two rules:
+- Scripts are run **level-by-level**.
+- If there are multiple scripts on the same level of the scope then scripts will be run in **lexicographical script-key
 order**.
 
 ## Available languages
@@ -238,14 +240,17 @@ Scripts are run using the [otto](https://pkg.go.dev/github.com/robertkrimen/otto
 
 #### Builtin functions
 
-| Name            | Params      | Returns | Description                     |
-|:----------------|:------------|:--------|:--------------------------------|
-| printlnExternal | `...Object` | Nothing | Legacy version of `console.log` |
+| Name              | Params      | Returns | Description                     |
+|:------------------|:------------|:--------|:--------------------------------|
+| `printlnExternal` | `...Object` | Nothing | Legacy version of `console.log` |
+| `console.log`     | `...Object` | Nothing | Will print to stdout            |
+| `console.error`   | `...Object` | Nothing | Will print to stderr            |
 
 #### Builtin symbols
 
-| Name             | Type   | Description                                                                                                                                                                                                                    |
-|:-----------------|:-------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `json`           | Object | The JOM. Aka. the JSON Document. Contains all key-value pairs accessible in the current scope. Editing values of keys will be reflected when evaluating a `.hjson` marked up with json-dom script.                             |
-| `__scriptPath__` | String | The JSON path to the current scope. Mostly just used by the `console` object to print out where a print came from.                                                                                                             |
-| `console`        | Object | The standard `console` object you know and love. Currently, the only supported methods are `log` and `error`. Both print the JSON path location to the call. The former will print to stdout. The latter will print to stderr. |
+| Name              | Type   | Description                                                                                                                                                                                                                    |
+|:------------------|:-------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `json`            | Object | The JOM. Aka. the JSON Document. Contains helpers and properties to aid with JSON manipulation.                                                                                                                                |
+| `json.trail`      | Object | Contains a replica of the key-value pairs of the JSON at the script's scope level. Any changes to it will be reflected in the final output JSON.                                                                               |
+| `json.scriptPath` | String | The JSON path to the current scope. Mostly just used by the `console` object to print out where a print came from.                                                                                                             |
+| `console`         | Object | The standard `console` object you know and love. Currently, the only supported methods are `log` and `error`. Both print the JSON path location to the call. The former will print to stdout. The latter will print to stderr. |

@@ -1,0 +1,24 @@
+[
+    {
+        name: John Smith
+        script:
+            '''#//!js
+            var first_last = json.trail.name.split(' ');
+            json.trail['first_name'] = first_last[0];
+            json.trail['last_name'] = first_last[1];
+            delete json.trail.name;
+            '''
+    },
+    {
+        name: Jane Doe
+        script:
+            '''#//!js
+            // The JSON path to the current scope is stored in the json.scopePath variable
+            console.log('Scope JSON path is ' + json.scopePath);
+            var first_last = json.trail.name.split(' ');
+            json.trail['first_name'] = first_last[0];
+            json.trail['last_name'] = first_last[1];
+            delete json.trail.name;
+            '''
+    }
+]

@@ -1,0 +1,6 @@
+{
+    no-supporty:
+        '''#//!py
+        json.trail['python'] = 'Would be pretty cool tho'
+        '''
+}

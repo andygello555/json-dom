@@ -1,0 +1,40 @@
+{
+  "person": {
+    "age": 18,
+    "name": "John Smith",
+    "pets": [
+      "Dog",
+      {
+        "attrs": {
+          "cute": true,
+          "evil": true
+        },
+        "name": "Bojangles",
+        "type": "Cat"
+      },
+      {
+        "attrs": {
+          "Woof0": "Bark",
+          "Woof1": "Bark",
+          "Woof2": "Bark",
+          "Woof3": "Bark",
+          "Woof4": "Bark",
+          "Woof5": "Bark",
+          "Woof6": "Bark",
+          "Woof7": "Bark",
+          "Woof8": "Bark",
+          "Woof9": "Bark"
+        },
+        "name": "Red-beard",
+        "type": "Dog"
+      },
+      {
+        "attrs": {
+          "loud": true
+        },
+        "name": "Fiddle Sticks",
+        "type": "Parrot"
+      }
+    ]
+  }
+}

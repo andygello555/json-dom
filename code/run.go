@@ -33,5 +33,5 @@ func Run(scriptLang string, script string, jsonMap json_map.JsonMapInt) (data js
 	if supportedLang, ok := SupportedLangs[scriptLang]; ok {
 		return supportedLang.runScript(script, jsonMap)
 	}
-	return nil, utils.UnsupportedScriptLang.FillError(scriptLang, fmt.Sprintf(utils.ScriptErrorFormatString, script))
+	return nil, utils.UnsupportedScriptLang.FillError(scriptLang, fmt.Sprintf(utils.ScriptErrorFormatString, jsonMap.GetCurrentScopePath(), script))
 }

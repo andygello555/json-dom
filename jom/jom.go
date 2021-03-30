@@ -37,8 +37,8 @@ type JsonMap struct {
 	insides   map[string]interface{}
 	// Used for certain traversal logic
 	traversal *Traversal
-	// Whether or not the JSON has an array at its root
-	array     bool
+	// Whether or not the JSON has an Array at its root
+	Array bool
 }
 
 // Returns the current scopes JSON Path to itself.
@@ -63,8 +63,8 @@ func (jsonMap *JsonMap) Clone(clear bool) json_map.JsonMapInt {
 		}
 	}
 	cleared := New()
-	// The cleared array still inherits the array field from the Cloned array
-	cleared.array = jsonMap.array
+	// The cleared Array still inherits the Array field from the Cloned Array
+	cleared.Array = jsonMap.Array
 	return cleared
 }
 
@@ -74,7 +74,7 @@ func New() *JsonMap {
 	return &JsonMap{
 		insides:   make(map[string]interface{}),
 		traversal: newTraversal(),
-		array:     false,
+		Array:     false,
 	}
 }
 
@@ -84,7 +84,7 @@ func NewFromMap(jsonMap map[string]interface{}) *JsonMap {
 	return &JsonMap{
 		insides:   jsonMap,
 		traversal: newTraversal(),
-		array:     false,
+		Array:     false,
 	}
 }
 
@@ -106,7 +106,7 @@ func CheckIfScript(script string) (isScript bool, shebangScriptLang string) {
 		if !utils.GetSupportedScriptTags()[shebangScriptLang] {
 			// We are going to panic here as the script is unsupported
 			// NOTE this will only panic when the shebang script is between the shorted and the longest supported lengths
-			panic(utils.UnsupportedScriptLang.FillError(shebangScriptLang, fmt.Sprintf(utils.ScriptErrorFormatString, script)))
+			panic(utils.UnsupportedScriptLang.FillError(shebangScriptLang, fmt.Sprintf(utils.ScriptErrorFormatString, utils.AnonymousScriptPath, script)))
 		}
 		return true, shebangScriptLang
 	}
@@ -287,7 +287,7 @@ func (jsonMap *JsonMap) Unmarshal(jsonBytes []byte) (err error) {
 	if err = hjson.Unmarshal(jsonBytes, &jsonMap.insides); err != nil {
 		// FIXME Find a better way of handling JSON with an array at their root
 		if strings.Contains(err.Error(), "value of type []interface {} is not assignable to type map[string]interface {}") {
-			jsonMap.array = true
+			jsonMap.Array = true
 			// Create an "array" key within jsonMap.insides that will contain the unmarshalled array
 			// When Marshalling into JSON check if this hack was used and deal with it accordingly
 			var rootArray []interface{}
@@ -295,7 +295,7 @@ func (jsonMap *JsonMap) Unmarshal(jsonBytes []byte) (err error) {
 				jsonMap.insides["array"] = rootArray
 			}
 		}
-		if !jsonMap.array {
+		if !jsonMap.Array {
 			return err
 		}
 	}
@@ -305,7 +305,7 @@ func (jsonMap *JsonMap) Unmarshal(jsonBytes []byte) (err error) {
 // Marshal a JsonMap back into JSON.
 func (jsonMap *JsonMap) Marshal() (out []byte, err error) {
 	// Marshal the output JSON
-	if !jsonMap.array {
+	if !jsonMap.Array {
 		out, err = json.Marshal(jsonMap.insides)
 	} else {
 		// Handle the root array hack

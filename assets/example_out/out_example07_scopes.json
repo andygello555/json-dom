@@ -1,0 +1,27 @@
+{
+  "people": [
+    {
+      "attrs": [
+        "Bug eyes",
+        "Black hair",
+        "Married to Nick Miller (spoilers)"
+      ],
+      "name": "Jessica Day"
+    },
+    {
+      "attrs": [
+        "Heavy drinker",
+        "Writer",
+        "Married to Jessica Day (spoilers)"
+      ],
+      "name": "Nick Miller"
+    },
+    {
+      "attrs": [
+        "Ferguson",
+        "Married to Ally (spoilers)"
+      ],
+      "name": "Winston Bishop"
+    }
+  ]
+}

@@ -1,13 +1,9 @@
 {
     // Tests scripts at different depths
     attrs: {
+        // No script in 'ere
         height_metres: 1.8
         shoe_size: 8
-        clown_shoe:
-            '''#//!js
-            // This won't be run because outer scope deletes this key
-            json['clown_shoe_size'] = json.shoe_size + 3
-            '''
     },
     person: {
         name: John Smith
@@ -15,13 +11,13 @@
         script:
             '''#//!js
             // JSON object only has a scope of the current object
-            json['age'] = 18
+            json.trail['age'] = 18
             '''
         pets: [
             "Dog",
             {
-                type: Cat,
-                name: Bojangles,
+                type: Cat
+                name: Bojangles
                 attrs: {
                     evil: true
                     cute: true
@@ -29,19 +25,19 @@
             },
             {
                 type: Dog
-                name: Red-beard,
+                name: Red-beard
                 attrs: {
                     // Lone script field
                     script:
                         '''#//!js
                         for (var i=0; i<10; i++) {
-                            json['Woof' + i] = 'Bark';
+                            json.trail['Woof' + i] = 'Bark';
                         }
                         '''
                 }
             },
             {
-                type: Parrot,
+                type: Parrot
                 name: Fiddle Sticks
                 attrs: {
                     loud: true
@@ -49,8 +45,12 @@
             }
         ]
     },
-    delete_attrs:
+    seren-scrippidy:
         '''#//!js
-        delete json.attrs
+        // Replaces person.name with two other fields: first_name and last_name
+        var first_last = json.trail.person.name.split(' ');
+        json.trail['person']['first_name'] = first_last[0];
+        json.trail['person']['last_name'] = first_last[1];
+        delete json.trail.person.name;
         '''
 }

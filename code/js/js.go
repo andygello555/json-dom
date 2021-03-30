@@ -6,10 +6,15 @@ import (
 	"github.com/andygello555/json-dom/jom/json_map"
 	"github.com/andygello555/json-dom/utils"
 	"github.com/robertkrimen/otto"
+	"io"
 	"os"
 	"strings"
 	"time"
 )
+
+// These can be set when testing to check output
+var ExternalConsoleLogStdout io.Writer = os.Stdout
+var ExternalConsoleLogStderr io.Writer = os.Stderr
 
 // Used to map a JS Object from Otto into a map so that it can be used
 func traverseObject(object *otto.Object) *map[string]interface{} {
@@ -54,16 +59,16 @@ func composePrint(call otto.FunctionCall) *strings.Builder {
 	var out strings.Builder
 	var callLocation string
 
-	if get, err := call.Otto.Get("__scopePath__"); err != nil {
-		callLocation = "__scopePath__ not found"
+	if get, err := call.Otto.Run("json.scopePath"); err != nil {
+		callLocation = "json.scopePath not found"
 	} else {
-		// Check if __scopePath__ is not a string (it has been overridden by user)
+		// Check if json.__scopePath__ is not a string (it has been overridden by user)
 		if !get.IsString() {
-			panic(utils.OverriddenBuiltin.FillError("__scopePath__"))
+			panic(utils.OverriddenBuiltin.FillError("json.scopePath"))
 		}
 		callLocation = fmt.Sprintf("<%s>", get.String())
 	}
-	_, _ = fmt.Fprintln(&out, "call from:", strings.Replace(call.CallerLocation(), "<anonymous>", callLocation, -1))
+	_, _ = fmt.Fprintln(&out, "call from:", strings.Replace(call.CallerLocation(), utils.AnonymousScriptPath, callLocation, -1))
 	var b strings.Builder
 	argList := call.ArgumentList
 
@@ -110,6 +115,10 @@ func composePrint(call otto.FunctionCall) *strings.Builder {
 	return &out
 }
 
+func jsonPathSelector(call otto.FunctionCall) otto.Value {
+	return otto.Value{}
+}
+
 // Struct representing a builtin function that can be called from within the JS environment
 type BuiltinFunc struct {
 	name     string
@@ -126,36 +135,47 @@ type BuiltinVar struct {
 var builtinFuncs = []BuiltinFunc{
 	// printlnExternal is a legacy version of the console.log
 	{"printlnExternal", func(call otto.FunctionCall) otto.Value {
-		fmt.Printf("Print %s\n", composePrint(call))
+		_, _ = fmt.Fprintf(ExternalConsoleLogStdout, "Print %s", composePrint(call))
 		return otto.NullValue()
 	}},
 }
 
 var builtinVars = []BuiltinVar{
-	{"__scopePath__", func(i ...interface{}) interface{} {
-		if jsonMap, ok := i[0].(json_map.JsonMapInt); ok {
-			return jsonMap.GetCurrentScopePath()
+	// Construct the main JOM object
+	{utils.JOMVariableName, func(i ...interface{}) interface{} {
+		runtime := i[0].(*otto.Otto)
+		jsonMap := i[1].(json_map.JsonMapInt)
+		trail, err := createJom(jsonMap)
+		if err != nil {
+			panic(utils.BuiltinGetterError.FillError("json.trail", "Could not JOM-ify"))
 		}
-		// Panic if we can't assert the given arg into a JsonMapInt
-		panic(utils.BuiltinGetterError.FillError("__scopePath__", fmt.Sprintf("Could not assert %v into JsonMapInt", i[0])))
+		jom := map[string]interface{} {
+			"trail": trail,
+			"jsonPathSelector": jsonPathSelector,
+			"scopePath": jsonMap.GetCurrentScopePath(),
+		}
+		if val, err := runtime.ToValue(jom); err != nil {
+			panic(utils.BuiltinGetterError.FillError("json", "Could not convert JOM into otto.Value"))
+		} else {
+			return val
+		}
 	}},
 	{"console", func(i ...interface{}) interface{} {
 		// Sets up the console object
 		runtime := i[0].(*otto.Otto)
 		consoleObj := map[string]interface{} {
 			"log": func(call otto.FunctionCall)otto.Value {
-				fmt.Printf("Print %s\n", composePrint(call))
+				_, _ = fmt.Fprintf(ExternalConsoleLogStdout, "Print %s", composePrint(call))
 				return otto.NullValue()
 			},
 			"error": func(call otto.FunctionCall)otto.Value {
 				// Redirect to stderr
-				_, _ = fmt.Fprintf(os.Stderr, "Error %s\n", composePrint(call))
+				_, _ = fmt.Fprintf(ExternalConsoleLogStderr, "Error %s", composePrint(call))
 				return otto.NullValue()
 			},
 		}
 		if val, err := runtime.ToValue(consoleObj); err != nil {
-			panic(err)
-			//panic(utils.BuiltinGetterError.FillError("console", "Could not convert console obj to otto.Value"))
+			panic(utils.BuiltinGetterError.FillError("console", "Could not convert console obj to otto.Value"))
 		} else {
 			return val
 		}
@@ -164,6 +184,7 @@ var builtinVars = []BuiltinVar{
 
 // Create the JOM within a Javascript VM, assign all necessary functions and retrieve the variable from within the VM.
 // This will create a JOM for the scope of the given json map.
+// NOTE this needs to be used to correctly parse Go arrays ([]interface{}) as JS arrays and not JS objects
 // Returns an otto.Value which can be plugged into the VM which will run the scripts. If an error occurs at any point
 // then an otto.NullValue and the error are returned.
 func createJom(jsonMap json_map.JsonMapInt) (run otto.Value, err error) {
@@ -196,7 +217,8 @@ func deJomIfy(jsonMap json_map.JsonMapInt, env *otto.Otto) (data json_map.JsonMa
 	data = jsonMap.Clone(true)
 
 	// Stringify and return the JOM (as a string)
-	run, err := env.Run("JSON.stringify(json)")
+	// NOTE JSON.stringify will strip keys that are functions out from the object
+	run, err := env.Run(fmt.Sprintf("JSON.stringify(%s.trail)", utils.JOMVariableName))
 	if err != nil {
 		return nil, err
 	}
@@ -218,12 +240,6 @@ func deJomIfy(jsonMap json_map.JsonMapInt, env *otto.Otto) (data json_map.JsonMa
 // 6. The environment is De-JOM-ified
 // 7. The new json_map.JsonMapInt is returned
 func RunScript(script string, jsonMap json_map.JsonMapInt) (data json_map.JsonMapInt, err error) {
-	// Create the JOM createJom
-	jomValue, err := createJom(jsonMap)
-	if err != nil {
-		return nil, err
-	}
-
 	// Create the VM and register all builtins
 	vm := otto.New()
 	// Register all builtins
@@ -235,8 +251,8 @@ func RunScript(script string, jsonMap json_map.JsonMapInt) (data json_map.JsonMa
 	for _, builtin := range builtinVars {
 		var err error
 		switch builtin.name {
-		case "__scopePath__":
-			err = vm.Set(builtin.name, builtin.getter(jsonMap))
+		case utils.JOMVariableName:
+			err = vm.Set(builtin.name, builtin.getter(vm, jsonMap))
 		case "console":
 			err = vm.Set(builtin.name, builtin.getter(vm))
 		default:
@@ -248,10 +264,6 @@ func RunScript(script string, jsonMap json_map.JsonMapInt) (data json_map.JsonMa
 		}
 	}
 
-	// Pass the JOM into the environment
-	if err = vm.Set(utils.JOMVariableName, jomValue); err != nil {
-		return nil, err
-	}
 	// Remove the shebang line from the script
 	script = strings.Join(strings.Split(script, "\n")[1:], "\n")
 
@@ -265,7 +277,7 @@ func RunScript(script string, jsonMap json_map.JsonMapInt) (data json_map.JsonMa
 			if caught == utils.HaltingProblem {
 				err = utils.HaltingProblem.FillError(
 					duration.String(),
-					fmt.Sprintf(utils.ScriptErrorFormatString, script),
+					fmt.Sprintf(utils.ScriptErrorFormatString, jsonMap.GetCurrentScopePath(), script),
 				)
 				return
 			}
@@ -286,7 +298,8 @@ func RunScript(script string, jsonMap json_map.JsonMapInt) (data json_map.JsonMa
 	// Run the script
 	_, err = vm.Run(script)
 	if err != nil {
-		return nil, err
+		// Re-wrap the error as a ScriptError
+		return nil, utils.ScriptError.FillError(err.Error(), fmt.Sprintf(utils.ScriptErrorFormatString, jsonMap.GetCurrentScopePath(), script))
 	}
 
 	// De-JOM-ify the environment and return the json_map.JsonMapInt

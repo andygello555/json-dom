@@ -5,27 +5,27 @@
     nested_boi: {
         script:
             '''#//!js
-            json['Hello'] = "World";
+            json.trail['Hello'] = "World";
             '''
     }
     d:
         '''#//!js
-        json['counter'] *= 3;
+        json.trail['counter'] *= 3;
         '''
     a:
         '''#//!js
-        json['counter'] += 6;
+        json.trail['counter'] += 6;
         '''
     c:
         '''#//!js
-        json['counter'] /= 2;
+        json.trail['counter'] /= 2;
         '''
     b:
         '''#//!js
-        json['counter'] -= 4;
+        json.trail['counter'] -= 4;
         '''
     e:
         '''#//!js
-        json['counter'] *= 3;
+        json.trail['counter'] *= 3;
         '''
 }
