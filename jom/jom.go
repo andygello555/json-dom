@@ -9,7 +9,9 @@ import (
 	"github.com/andygello555/json-dom/jom/json_map"
 	"github.com/andygello555/json-dom/utils"
 	"github.com/hjson/hjson-go"
+	"reflect"
 	"strings"
+	"sync"
 )
 
 // Traversal object which is composed within JsonMap. Holds some info about the current traversal.
@@ -41,33 +43,6 @@ type JsonMap struct {
 	Array bool
 }
 
-// Returns the current scopes JSON Path to itself.
-// This just uses the string builder within the traversal field
-func (jsonMap *JsonMap) GetCurrentScopePath() string {
-	return jsonMap.traversal.scopePath.String()
-}
-
-// Getter for insides.
-// Useful when using json_map.JsonMapInt
-func (jsonMap *JsonMap) GetInsides() *map[string]interface{} {
-	return &jsonMap.insides
-}
-
-// Return a clone of the JsonMap. If clear is given then a New will be called and returned.
-// NOTE this is primarily used when using json_map.JsonMapInt to return a new JsonMap to avoid cyclic imports
-func (jsonMap *JsonMap) Clone(clear bool) json_map.JsonMapInt {
-	if !clear {
-		return &JsonMap{
-			insides:   jsonMap.insides,
-			traversal: jsonMap.traversal,
-		}
-	}
-	cleared := New()
-	// The cleared Array still inherits the Array field from the Cloned Array
-	cleared.Array = jsonMap.Array
-	return cleared
-}
-
 // Construct a new empty JsonMap.
 // Returns a pointer to a JsonMap.
 func New() *JsonMap {
@@ -86,6 +61,166 @@ func NewFromMap(jsonMap map[string]interface{}) *JsonMap {
 		traversal: newTraversal(),
 		Array:     false,
 	}
+}
+
+// Return a clone of the JsonMap. If clear is given then a New will be called and returned.
+// NOTE this is primarily used when using json_map.JsonMapInt to return a new JsonMap to avoid cyclic imports
+func (jsonMap *JsonMap) Clone(clear bool) json_map.JsonMapInt {
+	if !clear {
+		return &JsonMap{
+			insides:   jsonMap.insides,
+			traversal: jsonMap.traversal,
+		}
+	}
+	cleared := New()
+	// The cleared Array still inherits the Array field from the Cloned Array
+	cleared.Array = jsonMap.Array
+	return cleared
+}
+
+// Returns the current scopes JSON Path to itself.
+// This just uses the string builder within the traversal field
+func (jsonMap *JsonMap) GetCurrentScopePath() string {
+	return jsonMap.traversal.scopePath.String()
+}
+
+// Getter for insides.
+// Useful when using json_map.JsonMapInt
+func (jsonMap *JsonMap) GetInsides() *map[string]interface{} {
+	return &jsonMap.insides
+}
+
+func pathFinder(path []interface{}, jsonMap map[string]interface{}, errChan chan<- error, valChan chan<- interface{}, wg *sync.WaitGroup) {
+	defer wg.Done()
+	var currValue interface{} = jsonMap
+	var err error = nil
+
+	// Iterate through the absolute path keys
+	for _, key := range path {
+		// First find the type of the key
+		var index bool
+		keyType := reflect.TypeOf(key).Name()
+		if keyType == "int" || keyType == "string" {
+			switch key.(type) {
+			case int:
+				index = true
+			case string:
+				index = false
+			}
+		} else {
+			err = utils.JsonPathError.FillError("Absolute path values must be either a string or an integer", fmt.Sprintf("Key is of type: %s", keyType))
+			break
+		}
+
+		// Then check the type of the map and take the according value
+		switch currValue.(type) {
+		case map[string]interface{}:
+			var ok bool
+			m := currValue.(map[string]interface{})
+			// Finding the 0th element of a map will return the first key (useful for recursive descent)
+			if index {
+				// Find the first element of the map
+				if key.(int) == 0 {
+					for val, _ := range m {
+						currValue = val
+						break
+					}
+				} else {
+					// Otherwise throw an error
+					err = utils.JsonPathError.FillError(fmt.Sprintf("Cannot access map %v with numerical key %v", currValue, key))
+					break
+				}
+			} else {
+				if currValue, ok = m[key.(string)]; !ok {
+					// If the key does not exist then push to the error channel and return
+					err = utils.JsonPathError.FillError(fmt.Sprintf("Key '%v' does not exist in map", key))
+					break
+				}
+			}
+		case []interface{}:
+			// Check if the index is in bounds
+			arr := currValue.([]interface{})
+			if index {
+				i := key.(int)
+				if i >= len(arr) || i < 0 {
+					err = utils.JsonPathError.FillError(fmt.Sprintf("Index (%d) is out of bounds for array of length %d", i, len(arr)))
+					break
+				}
+				currValue = arr[i]
+			} else {
+				err = utils.JsonPathError.FillError(fmt.Sprintf("Cannot access array %v with string index %v", arr, key))
+				break
+			}
+		default:
+			err = utils.JsonPathError.FillError(fmt.Sprintf("Cannot access key %v of type %s", key, reflect.TypeOf(currValue).Name()))
+			break
+		}
+	}
+
+	if err != nil {
+		// Push the error to the error channel if one has occurred
+		errChan <- err
+	} else {
+		// Push the value into the value channel
+		valChan <- currValue
+	}
+}
+
+// Given the list of absolute paths for a JsonMap, will return the list of values that said paths lead to
+// An absolute path is an array of strings, which represent map keys, and integers, which represent array indices.
+func (jsonMap *JsonMap) GetAbsolutePaths(absolutePaths *[][]interface{}) (values []interface{}, errs []error) {
+	// Create a wait group which all Finders will be added to
+	var wg sync.WaitGroup
+
+	// Both the channels can be buffered to be the length of the array of absolute paths to be evaluated
+	// Create a channel of errors which records all the errors that happen within the Finders
+	errsChan := make(chan error, len(*absolutePaths))
+	// Also create a channel for the return values found by the Finders
+	valuesChan := make(chan interface{}, len(*absolutePaths))
+
+	// Start the finders
+	for _, absolutePath := range *absolutePaths {
+		wg.Add(1)
+		go pathFinder(absolutePath, jsonMap.insides, errsChan, valuesChan, &wg)
+	}
+
+	// Wait for all Finders and then close the errors channel
+	wg.Wait()
+	close(errsChan)
+	close(valuesChan)
+
+	if len(errsChan) > 0 {
+		errs = make([]error, 0)
+		// Consume all the errors in the channel and append them to the error return array
+		for err := range errsChan {
+			errs = append(errs, err)
+		}
+		return values, errs
+	}
+
+	// Fill out the values array by consuming from the values channel
+	values = make([]interface{}, 0)
+	for value := range valuesChan {
+		values = append(values, value)
+	}
+	return values, nil
+}
+
+// Given a valid JSON path will return the list of pointers to json_map.JsonPathNode(s) that satisfy the JSON path
+//
+// This function supports the following JSON path syntax
+// - Property selection: .property BUT NOT ['property']
+// - Element selection: [n], [x, y, z]
+// - Recursive descent: ..property
+// - Wildcards: .property.*, [*]
+// - List slicing: [start:end], [start:], [-start:], [:end], [:-end]
+// - Filter expressions: [?(expression)]
+// - Current node syntax: @
+//
+// If a filter expression can be evaluated in JS and returns a boolean value then it counts as a valid filter expression
+func (jsonMap *JsonMap) JsonPathSelector(jsonPath string) (out []*json_map.JsonPathNode, err error) {
+	out = make([]*json_map.JsonPathNode, 0)
+	return out, nil
 }
 
 // Check if the given string contains a json-dom script.

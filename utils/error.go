@@ -58,6 +58,7 @@ var (
 	BuiltinGetterError    = RuntimeError{-3, "An error has occurred when getting the value of a builtin variable"}
 	OverriddenBuiltin     = RuntimeError{-4, "The following builtin was overridden"}
 	ScriptError           = RuntimeError{-5, "The following script has caused an error"}
+	JsonPathError		  = RuntimeError{-6, "A JSON path could not be evaluated for the following reasons"}
 )
 
 // Fill out a RuntimeError error with the given extra info
