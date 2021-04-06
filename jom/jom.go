@@ -10,6 +10,7 @@ import (
 	"github.com/andygello555/json-dom/utils"
 	"github.com/hjson/hjson-go"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -90,65 +91,151 @@ func (jsonMap *JsonMap) GetInsides() *map[string]interface{} {
 	return &jsonMap.insides
 }
 
-func pathFinder(path []interface{}, jsonMap map[string]interface{}, errChan chan<- error, valChan chan<- interface{}, wg *sync.WaitGroup) {
+func pathFinder(path []json_map.AbsolutePathKey, jsonMap map[string]interface{}, errChan chan<- error, valChan chan<- json_map.JsonPathNode, wg *sync.WaitGroup) {
 	defer wg.Done()
 	var currValue interface{} = jsonMap
 	var err error = nil
 
 	// Iterate through the absolute path keys
 	for _, key := range path {
-		// First find the type of the key
-		var index bool
-		keyType := reflect.TypeOf(key).Name()
-		if keyType == "int" || keyType == "string" {
-			switch key.(type) {
-			case int:
-				index = true
-			case string:
-				index = false
-			}
-		} else {
-			err = utils.JsonPathError.FillError("Absolute path values must be either a string or an integer", fmt.Sprintf("Key is of type: %s", keyType))
+		// StartEnd KeyTypes must be within a Slice key type so throw an error if so
+		if key.KeyType == json_map.StartEnd {
+			err = utils.JsonPathError.FillError("Cannot have a start/end key type outside a slice key type")
 			break
 		}
 
-		// Then check the type of the map and take the according value
+		// Check the type of the current value and take the according value
 		switch currValue.(type) {
 		case map[string]interface{}:
 			var ok bool
 			m := currValue.(map[string]interface{})
-			// Finding the 0th element of a map will return the first key (useful for recursive descent)
-			if index {
-				// Find the first element of the map
-				if key.(int) == 0 {
-					for val, _ := range m {
-						currValue = val
-						break
-					}
-				} else {
-					// Otherwise throw an error
-					err = utils.JsonPathError.FillError(fmt.Sprintf("Cannot access map %v with numerical key %v", currValue, key))
-					break
-				}
-			} else {
-				if currValue, ok = m[key.(string)]; !ok {
+			switch key.KeyType {
+			case json_map.StringKey:
+				if currValue, ok = m[key.Value.(string)]; !ok {
 					// If the key does not exist then push to the error channel and return
-					err = utils.JsonPathError.FillError(fmt.Sprintf("Key '%v' does not exist in map", key))
+					err = utils.JsonPathError.FillError(fmt.Sprintf("Key '%v' does not exist in map", key.Value))
 					break
 				}
+			case json_map.IndexKey | json_map.Slice:
+				err = utils.JsonPathError.FillError(fmt.Sprintf("Cannot access map %v with numerical key %v", currValue, key.Value))
+				break
+			case json_map.Wildcard:
+				// For wildcards return all the values of each key within the map
+				// To ensure that the same key isn't pulled twice when evaluating paths like this:
+				// {"person", "friends", 0, *, 0}
+				// {"person", "friends", 0, *, 1}
+				// We have to first push all the keys to a heap and then pop them off so that we have the same order
+				// each time we evaluate this map
+				keyQueue := make(utils.StringHeap, 0)
+				for k := range m {
+					keyQueue = append(keyQueue, k)
+				}
+				heap.Init(&keyQueue)
+
+				// Add the values of each key to a slice then set that slice to be the current value
+				currValueArr := make([]interface{}, 0)
+				for keyQueue.Len() > 0 {
+					currValueArr = append(currValueArr, m[heap.Pop(&keyQueue).(string)])
+				}
+				currValue = currValueArr
+			case json_map.First:
+				// Similar as with the wildcards we sort the keys alphabetically then set the value of the first, THAT
+				// IS A MAP, as the current value
+				keys := make([]string, 0)
+				for k := range m {
+					switch m[k].(type) {
+					case map[string]interface{}, []interface{}:
+						keys = append(keys, k)
+					default:
+						continue
+					}
+				}
+				// If there is nothing to recurse down then throw error
+				if len(keys) == 0 {
+					err = utils.JsonPathError.FillError(fmt.Sprintf("There are no maps to recurse down in %v", m))
+					break
+				}
+				// Otherwise sort the strings and take the value of the first key as the new current value
+				sort.Strings(keys)
+				currValue = m[keys[0]]
+			default:
+				err = utils.JsonPathError.FillError(fmt.Sprintf("AbsolutePathKey of type: %v is unrecognised", key.KeyType))
+				break
 			}
 		case []interface{}:
-			// Check if the index is in bounds
 			arr := currValue.([]interface{})
-			if index {
-				i := key.(int)
+			switch key.KeyType {
+			case json_map.StringKey:
+				err = utils.JsonPathError.FillError(fmt.Sprintf("Cannot access array %v with string index %v", arr, key.Value))
+				break
+			case json_map.IndexKey:
+				i := key.Value.(int)
 				if i >= len(arr) || i < 0 {
 					err = utils.JsonPathError.FillError(fmt.Sprintf("Index (%d) is out of bounds for array of length %d", i, len(arr)))
 					break
 				}
+				fmt.Println("Getting index:", i, "from", arr, "=", arr[i])
 				currValue = arr[i]
-			} else {
-				err = utils.JsonPathError.FillError(fmt.Sprintf("Cannot access array %v with string index %v", arr, key))
+			case json_map.Wildcard:
+				// If a wildcard then just set the current value to be equal to the array
+				currValue = arr
+			case json_map.First:
+				err = utils.JsonPathError.FillError("Cannot recurse into an array")
+				break
+			case json_map.Slice:
+				// For slices we'll see if we can do the slice natively in go ([start:end], [:end], [start:])
+				// Or for negative slices ([-1:], [:-1]) which are not supported natively so need to be converted
+				// Replace StartEnd key types with either the 0th index or the last
+				slice := key.Value.([]json_map.AbsolutePathKey)
+				sliceIndices := make([]int, 2)
+				if slice[0].KeyType == json_map.StartEnd {
+					sliceIndices[0] = 0
+				} else {
+					sliceIndices[0] = slice[0].Value.(int)
+				}
+				if slice[1].KeyType == json_map.StartEnd {
+					sliceIndices[1] = len(arr)
+				} else {
+					sliceIndices[1] = slice[1].Value.(int)
+				}
+
+				// Then we check for negatives
+				for i, idx := range sliceIndices {
+					if idx < 0 {
+						sliceIndices[i] = len(arr) + idx
+					}
+				}
+				fmt.Println("sliceIndices", sliceIndices)
+
+				// Wrap next bit inside anon func so we can catch any panics that occur
+				func() {
+					defer func() {
+						if caught := recover(); caught != nil {
+							switch caught.(type) {
+							case error:
+								// Wrap the error as a JsonPathError if the error has something to do with slices
+								if strings.Contains(caught.(error).Error(), "slice") {
+									err = utils.JsonPathError.FillError(fmt.Sprintf("Slice error occured: %v", caught))
+								} else {
+									// Otherwise something more awful has gone wrong
+									panic(caught)
+								}
+							default:
+								panic(caught)
+							}
+						}
+					}()
+					// Then set the current value to the slice
+					// NOTE this might panic so we set up a recovery function above so we can re-wrap any slice errors that occur
+					currValue = arr[sliceIndices[0]:sliceIndices[1]]
+				}()
+
+				// Break from the loop if an error has occurred
+				if err != nil {
+					break
+				}
+			default:
+				err = utils.JsonPathError.FillError(fmt.Sprintf("AbsolutePathKey of type: %v is unrecognised", key.KeyType))
 				break
 			}
 		default:
@@ -162,13 +249,16 @@ func pathFinder(path []interface{}, jsonMap map[string]interface{}, errChan chan
 		errChan <- err
 	} else {
 		// Push the value into the value channel
-		valChan <- currValue
+		valChan <- json_map.JsonPathNode{
+			Absolute: path,
+			Value:    currValue,
+		}
 	}
 }
 
 // Given the list of absolute paths for a JsonMap, will return the list of values that said paths lead to
 // An absolute path is an array of strings, which represent map keys, and integers, which represent array indices.
-func (jsonMap *JsonMap) GetAbsolutePaths(absolutePaths *[][]interface{}) (values []interface{}, errs []error) {
+func (jsonMap *JsonMap) GetAbsolutePaths(absolutePaths *json_map.AbsolutePaths) (values []*json_map.JsonPathNode, errs []error) {
 	// Create a wait group which all Finders will be added to
 	var wg sync.WaitGroup
 
@@ -176,11 +266,11 @@ func (jsonMap *JsonMap) GetAbsolutePaths(absolutePaths *[][]interface{}) (values
 	// Create a channel of errors which records all the errors that happen within the Finders
 	errsChan := make(chan error, len(*absolutePaths))
 	// Also create a channel for the return values found by the Finders
-	valuesChan := make(chan interface{}, len(*absolutePaths))
+	valuesChan := make(chan json_map.JsonPathNode, len(*absolutePaths))
 
 	// Start the finders
+	wg.Add(len(*absolutePaths))
 	for _, absolutePath := range *absolutePaths {
-		wg.Add(1)
 		go pathFinder(absolutePath, jsonMap.insides, errsChan, valuesChan, &wg)
 	}
 
@@ -199,9 +289,13 @@ func (jsonMap *JsonMap) GetAbsolutePaths(absolutePaths *[][]interface{}) (values
 	}
 
 	// Fill out the values array by consuming from the values channel
-	values = make([]interface{}, 0)
+	values = make([]*json_map.JsonPathNode, 0)
 	for value := range valuesChan {
-		values = append(values, value)
+		fmt.Println("Appending", value)
+		values = append(values, &json_map.JsonPathNode{
+			Absolute: value.Absolute,
+			Value:    value.Value,
+		})
 	}
 	return values, nil
 }
@@ -211,7 +305,7 @@ func (jsonMap *JsonMap) GetAbsolutePaths(absolutePaths *[][]interface{}) (values
 // This function supports the following JSON path syntax
 // - Property selection: .property BUT NOT ['property']
 // - Element selection: [n], [x, y, z]
-// - Recursive descent: ..property
+// - First descent: ..property (different to JSON path spec .. descends down the alphabetically first map/array)
 // - Wildcards: .property.*, [*]
 // - List slicing: [start:end], [start:], [-start:], [:end], [:-end]
 // - Filter expressions: [?(expression)]
@@ -220,7 +314,17 @@ func (jsonMap *JsonMap) GetAbsolutePaths(absolutePaths *[][]interface{}) (values
 // If a filter expression can be evaluated in JS and returns a boolean value then it counts as a valid filter expression
 func (jsonMap *JsonMap) JsonPathSelector(jsonPath string) (out []*json_map.JsonPathNode, err error) {
 	out = make([]*json_map.JsonPathNode, 0)
-	return out, nil
+	paths, err := utils.ParseJsonPath(jsonPath, jsonMap)
+	if err != nil {
+		return nil, err
+	}
+	values, errs := jsonMap.GetAbsolutePaths(&paths)
+
+	// Handle errors
+	if errs != nil {
+		return nil, utils.JsonPathError.FillFromErrors(errs)
+	}
+	return values, nil
 }
 
 // Check if the given string contains a json-dom script.

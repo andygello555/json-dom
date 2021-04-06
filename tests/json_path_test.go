@@ -3,6 +3,7 @@ package tests
 import (
 	"fmt"
 	"github.com/andygello555/json-dom/jom"
+	"github.com/andygello555/json-dom/jom/json_map"
 	"testing"
 )
 
@@ -37,7 +38,7 @@ var exampleBytes = []byte(`
 		name: John Smith
 		age: 18
 	},
-	forty: 40
+	over-forty: 40
 }`)
 
 // Stores the unmarshalled exampleBytes
@@ -45,53 +46,33 @@ var example *jom.JsonMap
 var exampleMap map[string]interface{}
 
 // Some example absolute paths to input into GetAbsolutePaths
-var exampleAbsolutePathInput = [][][]interface{} {
+var exampleAbsolutePathInput = []json_map.AbsolutePaths {
 	{
-		{"forty"},
-		{"person", "friends", 0},
-		{"person", "friends", 1},
+		{{json_map.StringKey, "over-forty"}},
+		{{json_map.StringKey, "person"}, {json_map.StringKey, "friends"}, {json_map.IndexKey, 0}},
+		{{json_map.StringKey, "person"}, {json_map.StringKey, "friends"}, {json_map.IndexKey, 1}},
 	},
 	{
-		{"person", "name"},
-		{"person", "age"},
-		{"person", "friends", 3},
-		{"person", "friends", 4},
+		{{json_map.StringKey, "person"}, {json_map.StringKey, "name"}},
+		{{json_map.StringKey, "person"}, {json_map.StringKey, "age"}},
+		{{json_map.StringKey, "person"}, {json_map.StringKey, "friends"}, {json_map.IndexKey, 3}},
+		{{json_map.StringKey, "person"}, {json_map.StringKey, "friends"}, {json_map.IndexKey, 4}},
+	},
+	// First descent
+	{
+		{{json_map.First, nil}},
+		{{json_map.StringKey, "person"}, {json_map.First, nil}},
 	},
 	{
-		{"person", "friends", -1},
-		{"person", "children"},
-		{1.2},
-		{"person", 1},
+		{{json_map.StringKey, "person"}, {json_map.StringKey, "friends"}, {json_map.IndexKey, -1}},
+		{{json_map.StringKey, "person"}, {json_map.StringKey, "children"}},
+		{{json_map.IndexKey, 1.2}},
+		{{json_map.StringKey, "person"}, {json_map.IndexKey, 1}},
 	},
 }
 
 // The output of GetAbsolutePaths after inputting exampleAbsolutePathInput absolute paths
-var exampleAbsolutePathOutput = [][]interface{} {
-	{
-		40,
-		map[string]interface{} {
-			"name": "Jane Doe",
-			"age": 24,
-		},
-		map[string]interface{} {
-			"name": "Bob Smith",
-			"age": 55,
-		},
-	},
-	{
-		"John Smith",
-		18,
-		map[string]interface{}{
-			"name": "Gary Twain",
-			"age":  40,
-		},
-		map[string]interface{} {
-			"name": "Elizabeth Swindon",
-			"age": 21,
-		},
-	},
-	{},
-}
+var exampleAbsolutePathOutput [][]interface{}
 
 // Json paths evaluate using the above example
 var exampleJsonPathInput = []string{
@@ -101,17 +82,18 @@ var exampleJsonPathInput = []string{
 	// Array selection
 	"$.person.friends[0]",
 	"$.person.friends[0, 2, 4]",
-	// Recursive descent
+	// First descent
 	"$..friends[1].name",
 	// Wildcard
 	"$.person.friends[*]",
-	"$.person.friends[0].*",
+	"$.person.friends[0].*[0, 1]",
 	// List slicing
 	"$..friends[1:5]",
 	"$..friends[1:]",
 	"$..friends[:2]",
 	"$..friends[-2:]",
-	// Filter expressions
+	"$..friends[:-3]",
+	//Filter expressions
 	//"$..friends[?(@.age==21)]",
 	//"$..friends[?(@.name!='Gary Twain')]",
 	//"$..friends[?(@.age>39)]",
@@ -119,8 +101,8 @@ var exampleJsonPathInput = []string{
 	//"$..friends[?(@.age<30)]",
 	//"$..friends[?(@.age<=24)]",
 	//"$..friends[?(!@.age)]",
-	//"$..friends[?(@.name=='Bob Smith' && @.age > $.forty)]",
-	//"$..friends[?(@.age < 30 || @.age > $.forty)]",
+	//"$..friends[?(@.name=='Bob Smith' && @.age > $.over-forty)]",
+	//"$..friends[?(@.age < 30 || @.age > $.over-forty)]",
 }
 var exampleJsonPathOutput [][]interface{}
 
@@ -176,7 +158,7 @@ func init() {
 		{exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[1].(map[string]interface{})["name"]},
 		// $.person.friends[*]
 		{exampleMap["person"].(map[string]interface{})["friends"].([]interface{})},
-		// $.person.friends[0].*
+		// $.person.friends[0].*[0, 1]
 		{
 			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[0].(map[string]interface{})["name"],
 			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[0].(map[string]interface{})["age"],
@@ -189,11 +171,43 @@ func init() {
 		{exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[:2]},
 		// $..friends[-2:]
 		{exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[4:]},
+		// $..friends[:-3]
+		{exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[:3]},
+	}
+
+	// Fill out the absolute path expected outputs
+	exampleAbsolutePathOutput = [][]interface{} {
+		// {"over-forty"},
+		// {"person", "friends", 0},
+		// {"person", "friends", 1},
+		{
+			exampleMap["over-forty"],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[0],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[1],
+		},
+		// {"person", "name"},
+		// {"person", "age"},
+		// {"person", "friends", 3},
+		// {"person", "friends", 4},
+		{
+			exampleMap["person"].(map[string]interface{})["name"],
+			exampleMap["person"].(map[string]interface{})["age"],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[3],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[4],
+		},
+		// First descent
+		// {*},
+		// {"person", *},
+		{
+			exampleMap["person"],
+			exampleMap["person"].(map[string]interface{})["friends"],
+		},
+		{},
 	}
 }
 
 func TestAbsolutePath(t *testing.T) {
-	// Iterate over all example absolute paths to input into GetAbsolutePaths
+	// Run all the examples then iterate through all the returned actual values and check for equality with the expected
 	for i, absolutePath := range exampleAbsolutePathInput {
 		values, err := example.GetAbsolutePaths(&absolutePath)
 		if err != nil {
@@ -204,9 +218,15 @@ func TestAbsolutePath(t *testing.T) {
 			}
 		}
 
+		// Create a new array which contains just the value of each returned JsonPathNode
+		nodeVals := make([]interface{}, 0)
+		for _, node := range values {
+			nodeVals = append(nodeVals, node.Value)
+		}
+		fmt.Println("values:", nodeVals, "expected:", exampleJsonPathOutput[i])
 		// Check if the values returned by GetAbsolutePaths is equal to the expected values
-		if !sameInterfaceSlice(values, exampleAbsolutePathOutput[i]) {
-			t.Errorf("%v and %v are not equal", values, exampleAbsolutePathOutput[i])
+		if !sameInterfaceSlice(nodeVals, exampleAbsolutePathOutput[i]) {
+			t.Errorf("%v and %v are not equal (absolute path: %v)", nodeVals, exampleAbsolutePathOutput[i], absolutePath)
 		}
 	}
 }
@@ -225,9 +245,10 @@ func TestJsonPath(t *testing.T) {
 		for _, node := range nodes {
 			nodeVals = append(nodeVals, node.Value)
 		}
+		fmt.Println("values:", nodeVals, "expected:", exampleJsonPathOutput[i])
 		// Use reflect.DeepEqual to check equality between expected and array of nodeVals
 		if !sameInterfaceSlice(nodeVals, exampleJsonPathOutput[i]) {
-			t.Errorf("%v and %v are not equal", nodeVals, exampleJsonPathOutput[i])
+			t.Errorf("%v and %v are not equal (JSON path: %s)", nodeVals, exampleJsonPathOutput[i], jsonPath)
 		}
 	}
 }

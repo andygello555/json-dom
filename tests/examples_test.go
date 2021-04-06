@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/andygello555/json-dom/code/js"
 	"github.com/andygello555/json-dom/jom"
+	"github.com/andygello555/json-dom/utils"
 	"io/ioutil"
 	"path/filepath"
 	"reflect"
@@ -54,10 +55,11 @@ var buffers = map[string]*strings.Builder{
 	"stdout": &stdoutBuffer,
 	"stderr": &stderrBuffer,
 }
+var exampleTable []exampleTableEntry
 
-func TestExamples(t *testing.T) {
+func init() {
 	// Fill out example table by reading from file
-	exampleTable := make([]exampleTableEntry, 0)
+	exampleTable = make([]exampleTableEntry, 0)
 	if files, err := ioutil.ReadDir(exampleLocation); err != nil {
 		panic(err)
 	} else {
@@ -89,6 +91,11 @@ func TestExamples(t *testing.T) {
 	js.ExternalConsoleLogStdout = &stdoutBuffer
 	js.ExternalConsoleLogStderr = &stderrBuffer
 
+	// Set the halting time delay so that the halting problem examples run a bit quicker
+	utils.HaltingDelay = 1
+}
+
+func TestExamples(t *testing.T) {
 	// Iterate through examples
 	for _, example := range exampleTable {
 		// Run inside an anonymous function so that defers can be called safely

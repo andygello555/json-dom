@@ -2,6 +2,7 @@ package utils
 
 import (
 	"strings"
+	"unicode"
 )
 
 // StringHeap priority queue used when evaluating script
@@ -24,4 +25,16 @@ func (spq *StringHeap) Pop() interface{} {
 	str := old[n-1]
 	*spq = old[0 : n-1]
 	return str
+}
+
+// Given a string, will strip all whitespace from it and return a new string without any whitespace
+func StripWhitespace(str string) string {
+	var b strings.Builder
+	b.Grow(len(str))
+	for _, ch := range str {
+		if !unicode.IsSpace(ch) {
+			b.WriteRune(ch)
+		}
+	}
+	return b.String()
 }

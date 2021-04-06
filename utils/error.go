@@ -81,3 +81,12 @@ func (e *RuntimeError) FillError(extraInfo ...string) error {
 	}
 	return errors.New(message)
 }
+
+func (e *RuntimeError) FillFromErrors(errs []error) error {
+	// Create an array of the error messages so that they can be re-wrapped into another RuntimeError
+	errString := make([]string, len(errs))
+	for _, e := range errs {
+		errString = append(errString, e.Error())
+	}
+	return e.FillError(errString...)
+}

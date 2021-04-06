@@ -9,10 +9,14 @@ const (
 	LongestSupportedScriptTagLen  = 2
 	JOMVariableName               = "json"
 	KeyValuePairDelim             = ':'
-	HaltingDelay                  = 4
 	HaltingDelayUnits             = time.Second
 	ScriptErrorFormatString       = "script <%s>:\n```\n%s\n```"
 	AnonymousScriptPath           = "<anonymous>"
+)
+
+// These are global variables that can be changed
+var (
+	HaltingDelay = 4
 )
 
 // Gets a map of all the supported script shebang suffixes

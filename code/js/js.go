@@ -290,7 +290,7 @@ func RunScript(script string, jsonMap json_map.JsonMapInt) (data json_map.JsonMa
 
 	// Start the timer
 	go func() {
-		time.Sleep(utils.HaltingDelay * utils.HaltingDelayUnits)
+		time.Sleep(time.Duration(utils.HaltingDelay) * utils.HaltingDelayUnits)
 		vm.Interrupt <- func() {
 			panic(utils.HaltingProblem)
 		}
