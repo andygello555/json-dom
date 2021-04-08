@@ -94,15 +94,16 @@ var exampleJsonPathInput = []string{
 	"$..friends[-2:]",
 	"$..friends[:-3]",
 	//Filter expressions
-	//"$..friends[?(@.age==21)]",
-	//"$..friends[?(@.name!='Gary Twain')]",
-	//"$..friends[?(@.age>39)]",
-	//"$..friends[?(@.age>=40)]",
-	//"$..friends[?(@.age<30)]",
-	//"$..friends[?(@.age<=24)]",
-	//"$..friends[?(!@.age)]",
-	//"$..friends[?(@.name=='Bob Smith' && @.age > $.over-forty)]",
-	//"$..friends[?(@.age < 30 || @.age > $.over-forty)]",
+	"$..friends[?(@.age==21)][0]",
+	"$..friends[?(@.name!='Gary Twain')][0, 1, 2, 3, 4]",
+	"$..friends[?(@.age>39)][0, 1]",
+	"$..friends[?(@.age>=40)][0, 1]",
+	"$..friends[?(@.age<30)][0, 1]",
+	"$..friends[?(@.age<=24)][0, 1]",
+	"$..friends[?(!@.age)][0]",
+	"$..friends[?(@.name=='Bob Smith' && @.age > $.over-forty)][0]",
+	"$..friends[?(@.age < 30 || @.age > $.over-forty)][0, 1, 2]",
+	"$..friends[?(@.name == 'Bob Smith' || @.age > $.over-forty && @.name != 'hello @ world I come $.json.path in peace')][0]",
 }
 var exampleJsonPathOutput [][]interface{}
 
@@ -173,6 +174,48 @@ func init() {
 		{exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[4:]},
 		// $..friends[:-3]
 		{exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[:3]},
+		// $..friends[?(@.age==21)]
+		{exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[4]},
+		// $..friends[?(@.name!='Gary Twain')]
+		{
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[0],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[1],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[2],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[4],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[5],
+		},
+		// $..friends[?(@.age>39)]
+		{
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[1],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[3],
+		},
+		//$..friends[?(@.age>=40)]
+		{
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[1],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[3],
+		},
+		//$..friends[?(@.age<30)]
+		{
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[0],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[4],
+		},
+		//$..friends[?(@.age<=24)]
+		{
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[0],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[4],
+		},
+		// $..friends[?(!@.age)]
+		{exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[5]},
+		// $..friends[?(@.name=='Bob Smith' && @.age > $.over-forty)]
+		{exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[1]},
+		// $..friends[?(@.age < 30 || @.age > $.over-forty)]
+		{
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[0],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[1],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[4],
+		},
+		// $..friends[?(@.name == 'Bob Smith' || @.age > $.over-forty && @.name != 'hello @ world I come $.json.path in peace')]
+		{exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[1]},
 	}
 
 	// Fill out the absolute path expected outputs

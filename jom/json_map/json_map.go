@@ -10,6 +10,7 @@ const (
 	StringKey AbsolutePathKeyType = iota
 	IndexKey  AbsolutePathKeyType = iota
 	Wildcard  AbsolutePathKeyType = iota
+	Filter    AbsolutePathKeyType = iota
 	First     AbsolutePathKeyType = iota
 	Slice     AbsolutePathKeyType = iota
 	// NOTE the following should only be used within a Slice AbsolutePathKey's Value
@@ -22,6 +23,7 @@ var absolutePathKeyTypeNames = map[AbsolutePathKeyType]string {
 	StringKey: "StringKey",
 	IndexKey:  "IndexKey",
 	Wildcard:  "Wildcard",
+	Filter:    "Filter",
 	First:     "First",
 	Slice:     "Slice",
 	StartEnd:  "StartEnd",

@@ -9,10 +9,13 @@ import (
 	"github.com/andygello555/json-dom/jom/json_map"
 	"github.com/andygello555/json-dom/utils"
 	"github.com/hjson/hjson-go"
+	"github.com/robertkrimen/otto"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Traversal object which is composed within JsonMap. Holds some info about the current traversal.
@@ -179,6 +182,190 @@ func pathFinder(path []json_map.AbsolutePathKey, jsonMap map[string]interface{},
 			case json_map.Wildcard:
 				// If a wildcard then just set the current value to be equal to the array
 				currValue = arr
+			case json_map.Filter:
+				// For Filters we first have to replace all all @ chars with the current node that has been Marshalled
+				// into JSON then JSON.parse-d. And we have to also replace all the JSON paths with calculated literals
+				stringLiterals := regexp.MustCompile("['\"]([^\\\\\"']|\\\\.)*['\"]")
+				jsonPathRegex := regexp.MustCompile("\\$[.\\[][^'\"\\n\\r\\s]+")
+				filterExp := []byte(key.Value.(string))
+
+				// Get the locations of the start and end of all string literals
+				stringLiteralLocs := stringLiterals.FindAllIndex(filterExp, -1)
+				fmt.Println("string literal locations:", stringLiteralLocs)
+
+
+				// We can replace all occurrences of any JSON path expressions within the filter expression with the
+				// literal values to which they evaluate to straight away so that they don't interfere with current node
+				// replacement
+				jsonPathLocs := jsonPathRegex.FindAllIndex(filterExp, -1)
+				// Stores the locations of each JSON path that occurs within the filter expression
+				jsonPathIndices := make([][]int, 0)
+				// Stores the marshalled literal values
+				jsonPathLiterals := make([]string, 0)
+
+				if len(jsonPathLocs) > 0 {
+					myJson := NewFromMap(jsonMap)
+					// Then we do a similar thing for JSON path expressions within the filter expression
+					for _, jsonPathLoc := range jsonPathLocs {
+						within := false
+						for _, stringLiteralLoc := range stringLiteralLocs {
+							if jsonPathLoc[1] - jsonPathLoc[0] <= stringLiteralLoc[1] - stringLiteralLoc[0] - 2 {
+								if jsonPathLoc[0] >= stringLiteralLoc[0] && jsonPathLoc[1] <= stringLiteralLoc[1] {
+									within = true
+									break
+								}
+							}
+						}
+
+						// If the json path is not within any string literals then evaluate the path to find the values
+						// and unwrap the returned values and wrap them back up in an index struct
+						if !within {
+							// We can find the JSON path straight away and append its location and values to the slice
+							var values []*json_map.JsonPathNode
+							fmt.Println("evaluating JSON path:", string(filterExp)[jsonPathLoc[0]:jsonPathLoc[1]])
+							values, err = myJson.JsonPathSelector(string(filterExp)[jsonPathLoc[0]:jsonPathLoc[1]])
+							if err != nil {
+								break
+							}
+
+							var valueRaw interface{}
+							// If we only have one node then we can just set that as the value
+							if len(values) == 1 {
+								valueRaw = values[0].Value
+							} else {
+								// Unwrap the values into an interface{} slice and set the index struct value to the unwrapped slice
+								valueArr := make([]interface{}, 0)
+								for _, node := range values {
+									valueArr = append(valueArr, node.Value)
+								}
+								valueRaw = valueArr
+							}
+
+							// Then we marshall the value into a JS datatype using json.Marshall
+							var literal []byte
+							literal, err = json.Marshal(valueRaw)
+							if err != nil {
+								break
+							}
+
+							// We then add the location of the JSON path expression to a slice as well as the literal
+							// byte slice to another array that we will evaluate after this
+							jsonPathIndices = append(jsonPathIndices, jsonPathLoc)
+							jsonPathLiterals = append(jsonPathLiterals, string(literal))
+						}
+					}
+				}
+
+				// Break out if any errors have occurred
+				if err != nil {
+					err = utils.JsonPathError.FillError(err.Error())
+					break
+				}
+
+				// Replace all the occurrences of any JSON path expression within the filter expression with the
+				// literal evaluation of each JSON path calculated above
+				if len(jsonPathIndices) > 0 {
+					filterExp = []byte(utils.ReplaceCharIndexRange(string(filterExp), jsonPathIndices, jsonPathLiterals...))
+					// All string literal locations also have to be recalculated as there were changes made to the
+					// filter expression
+					stringLiteralLocs = stringLiterals.FindAllIndex(filterExp, -1)
+					fmt.Println("after replacing JSON path expressions with literal evals:", string(filterExp))
+				}
+
+				currentNodeIndices := make([]int, 0)
+				// Find all current node indices that lie outside the string literal matches
+				for i, char := range string(filterExp) {
+					if char == '@' {
+						within := false
+						for _, stringLiteralLoc := range stringLiteralLocs {
+							// If the @ lies inside a string literal then skip it
+							if i >= stringLiteralLoc[0] && i <= stringLiteralLoc[1] {
+								within = true
+								break
+							}
+						}
+						// Only add it if its not within a string lit.
+						if !within {
+							currentNodeIndices = append(currentNodeIndices, i)
+						}
+					}
+				}
+
+				// Set up the slice which stores all the nodes where the expression evaluates to true as well as the VM
+				// to run everything inside
+				truers := make([]interface{}, 0)
+				vm := otto.New()
+				for _, node := range arr {
+					currentExpression := make([]byte, len(filterExp))
+					copy(currentExpression, filterExp)
+					if len(currentNodeIndices) != 0 {
+						// Then we want to marshal the current node and replace all occurrences with that unmarshalled literal
+						var literal []byte
+						literal, err = json.Marshal(node)
+						if err != nil {
+							break
+						}
+
+						// Finally replace the @ characters in the expression with the current node
+						currentExpression = []byte(utils.ReplaceCharIndex(string(currentExpression), string(literal), currentNodeIndices...))
+					}
+
+					// Evaluate the expression within the VM
+					var expressionReturn otto.Value
+					// Wrap the execution in an anonymous function so we can handle the halting problem
+					func() {
+						// To stop infinite loops start a timer which will panic once the timer stops and be caught in a deferred func
+						start := time.Now()
+						// This will catch any panics thrown by running the script/the timer
+						defer func() {
+							duration := time.Since(start)
+							if caught := recover(); caught != nil {
+								// If the caught error is the HaltingProblem var then package it up using FillError and set the outer error
+								if caught == utils.HaltingProblem {
+									err = utils.HaltingProblem.FillError(
+										duration.String(),
+										string(filterExp),
+									)
+									return
+								}
+								// Another error that we should panic for
+								panic(caught)
+							}
+						}()
+
+						vm.Interrupt = make(chan func(), 1)
+
+						// Start the timer
+						go func() {
+							time.Sleep(1 * utils.HaltingDelayUnits)
+							vm.Interrupt <- func() {
+								panic(utils.HaltingProblem)
+							}
+						}()
+						// NOTE: how we wrap the expression in !!() this is to try to convert to boolean
+						expressionReturn, err = vm.Run(fmt.Sprintf("!!(%s)", string(currentExpression)))
+					}()
+					if err != nil {
+						break
+					}
+					// Break out with an error if the returned value is not a boolean
+					if !expressionReturn.IsBoolean() {
+						err = errors.New("filter does not return boolean")
+						break
+					}
+					truer, _ := expressionReturn.ToBoolean()
+					fmt.Println("expression at node", node, "is", string(currentExpression), "=", truer)
+					// Otherwise add the node to the truers slice if the returned value is true
+					if truer {
+						truers = append(truers, node)
+					}
+				}
+				if err != nil {
+					err = utils.JsonPathError.FillError(fmt.Sprintf("An error has occurred while evaluating the filter expression \"%s\": %v", string(filterExp), err))
+					break
+				}
+				// Set current value to be the nodes which evaluated to true when filter expression was parsed
+				currValue = truers
 			case json_map.First:
 				err = utils.JsonPathError.FillError("Cannot recurse into an array")
 				break

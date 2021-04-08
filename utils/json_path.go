@@ -25,7 +25,7 @@ type state struct {
 var (
 	property = state{
 		name:       "Property (property)",
-		tokenRegex: regexp.MustCompile("([a-zA-Z_]+([a-zA-Z0-9_]*)|\\*)"),
+		tokenRegex: regexp.MustCompile("([a-zA-Z_]+([a-zA-Z0-9_-]*)|\\*)"),
 		validator:  func(token []byte, togo []byte, jsonMap json_map.JsonMapInt) (absolutePathKeys []json_map.AbsolutePathKey, errs []error) {
 			absolutePathKeys = make([]json_map.AbsolutePathKey, 0)
 			switch {
@@ -50,6 +50,14 @@ var (
 		// We allow anything to be written as a filter expression as it will be passed to otto which will parse the
 		// expression and throw up an error if it's incorrect
 		tokenRegex: regexp.MustCompile("\\[\\?\\(.*\\)]"),
+		validator: func(token []byte, togo []byte, jsonMap json_map.JsonMapInt) (absolutePathKeys []json_map.AbsolutePathKey, errs []error) {
+			// We just add the expression body to the absolute path keys
+			absolutePathKeys = []json_map.AbsolutePathKey{{
+				KeyType: json_map.Filter,
+				Value:   string(regexp.MustCompile("(\\[\\?\\(|\\)])").ReplaceAll(token, []byte(""))),
+			}}
+			return absolutePathKeys, nil
+		},
 	}
 	index = state{
 		name:       "Array Index ([n])",
@@ -177,6 +185,7 @@ var fromStateToStates = map[string][]*state {
 	"Dot (.)": {&dot, &index, &filter, &property},
 	"Array Index ([n])": {&index, &dot, &filter},
 	"Property (property)": {&dot, &index, &filter},
+	"Filter Expression ([?(...)])": {&dot, &index, &filter},
 }
 
 // Will decide the next state given a list of possible states and call the validator for that next state
@@ -213,6 +222,7 @@ func (s *state) handler(togo []byte, jsonMap json_map.JsonMapInt, absolutePaths 
 		if errs != nil {
 			return nil, JsonPathError.FillFromErrors(errs)
 		}
+		fmt.Println("nextPaths:", nextPaths)
 
 		// Add the nextPath variable to the end of all absolute paths
 		errs = absolutePaths.AddToAll(jsonMap, nextPaths...)
