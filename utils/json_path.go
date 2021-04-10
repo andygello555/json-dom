@@ -132,7 +132,6 @@ var (
 						blank = true
 					}
 				}
-				fmt.Println(slice)
 				absolutePathKeys = append(absolutePathKeys, json_map.AbsolutePathKey{
 					KeyType: json_map.Slice,
 					Value:   slice,
@@ -190,13 +189,13 @@ var fromStateToStates = map[string][]*state {
 
 // Will decide the next state given a list of possible states and call the validator for that next state
 func (s *state) handler(togo []byte, jsonMap json_map.JsonMapInt, absolutePaths *json_map.AbsolutePaths) (next *state, err error) {
-	fmt.Println("togo:", string(togo), "togo len:", len(togo))
+	//fmt.Println("togo:", string(togo), "togo len:", len(togo))
 	next = nil
 	var token []byte
 
 	if len(strings.TrimSpace(string(togo))) != 0 {
 		possibleStates := fromStateToStates[s.name]
-		fmt.Println("posssible states:", possibleStates)
+		//fmt.Println("posssible states:", possibleStates)
 
 		// Find which state is next by checking the regex of each possible state on the characters to go
 		for _, possibleState := range possibleStates {
@@ -204,7 +203,6 @@ func (s *state) handler(togo []byte, jsonMap json_map.JsonMapInt, absolutePaths 
 			if occurrences := possibleState.tokenRegex.FindIndex(togo); len(occurrences) != 0 && occurrences[0] == 0 {
 				next = possibleState
 				token = togo[occurrences[0]:occurrences[1]]
-				fmt.Println("found state", next, "occurrence:", string(togo[occurrences[0]:occurrences[1]]))
 				break
 			}
 		}
@@ -215,14 +213,14 @@ func (s *state) handler(togo []byte, jsonMap json_map.JsonMapInt, absolutePaths 
 			}
 			return nil, JsonPathError.FillError(fmt.Sprintf("Could not find any of the possible states: %v, when at a %s: '%s'", possibleStateNames, s.name, token))
 		}
-		fmt.Println("next state:", next)
+		//fmt.Println("next state:", next)
 
 		// Run the validator for the next state
 		nextPaths, errs := next.validator(token, togo, jsonMap)
 		if errs != nil {
 			return nil, JsonPathError.FillFromErrors(errs)
 		}
-		fmt.Println("nextPaths:", nextPaths)
+		//fmt.Println("nextPaths:", nextPaths)
 
 		// Add the nextPath variable to the end of all absolute paths
 		errs = absolutePaths.AddToAll(jsonMap, nextPaths...)
@@ -261,7 +259,7 @@ func ParseJsonPath(jsonPath string, jsonMap json_map.JsonMapInt) (absolutePaths 
 		if currentState.name == "End" {
 			break
 		}
-		fmt.Println("\ncurrentState", currentState, "previousState", previousState)
+		//fmt.Println("\ncurrentState", currentState, "previousState", previousState)
 
 		// Peak all the bytes until the end of the buffer
 		next, _ := jsonPathReader.Peek(jsonPathReader.Size())
@@ -288,6 +286,6 @@ func ParseJsonPath(jsonPath string, jsonMap json_map.JsonMapInt) (absolutePaths 
 			return nil, err
 		}
 	}
-	fmt.Println(absolutePaths)
+	//fmt.Println(absolutePaths)
 	return absolutePaths, nil
 }

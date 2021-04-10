@@ -12,6 +12,8 @@ const (
 	HaltingDelayUnits             = time.Second
 	ScriptErrorFormatString       = "script <%s>:\n```\n%s\n```"
 	AnonymousScriptPath           = "<anonymous>"
+	CurrentNodeLiteralVarName     = "__currentNodeLiteral__"
+	CurrentNodeValueVarName       = "__currentNode__"
 )
 
 // These are global variables that can be changed

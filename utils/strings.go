@@ -40,21 +40,24 @@ func StripWhitespace(str string) string {
 	return b.String()
 }
 
-// Will replace all characters at the given indices with the new string. Returns a new string.
-// Indices are all the character indices with which to replace with the new string
-func ReplaceCharIndex(old string, new string, indices... int) string {
-	if len(indices) > 0 {
+// Will replace all characters at the given indices with the new strings. Returns a new string.
+// Indices are all the character indices with which to replace with the new string. Each occurrence will be replaced by
+// the string new[occCount % len(new)]. Where occCount is the current count of the indices that have been replaced.
+func ReplaceCharIndex(old string, indices []int, new... string) string {
+	if len(indices) > 0 && len(new) > 0 {
 		// Lets sort the indices so that we can pop them in ascending order
 		sort.Ints(indices)
 		// Pop the first element
 		var currIdx int
 		currIdx, indices = indices[0], indices[1:]
+		occCount := 0
 
 		var b strings.Builder
 		for idx, val := range old {
 			if currIdx == idx {
 				// If we have reached an index to replace then write the new string and pop the new idx
-				b.WriteString(new)
+				b.WriteString(new[idx % len(new)])
+				occCount++
 				if len(indices) > 0 {
 					currIdx, indices = indices[0], indices[1:]
 				}
@@ -62,7 +65,6 @@ func ReplaceCharIndex(old string, new string, indices... int) string {
 				// Otherwise write the current character
 				b.WriteString(string(val))
 			}
-			idx++
 		}
 		return b.String()
 	}

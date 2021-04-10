@@ -93,7 +93,7 @@ var exampleJsonPathInput = []string{
 	"$..friends[:2]",
 	"$..friends[-2:]",
 	"$..friends[:-3]",
-	//Filter expressions
+	// Filter expressions (on arrays)
 	"$..friends[?(@.age==21)][0]",
 	"$..friends[?(@.name!='Gary Twain')][0, 1, 2, 3, 4]",
 	"$..friends[?(@.age>39)][0, 1]",
@@ -104,6 +104,12 @@ var exampleJsonPathInput = []string{
 	"$..friends[?(@.name=='Bob Smith' && @.age > $.over-forty)][0]",
 	"$..friends[?(@.age < 30 || @.age > $.over-forty)][0, 1, 2]",
 	"$..friends[?(@.name == 'Bob Smith' || @.age > $.over-forty && @.name != 'hello @ world I come $.json.path in peace')][0]",
+	"$..friends[*].name[?(@.length >= 14)][0, 1]",
+	// Filter expressions (on maps)
+	"$[?(@.friends && @.name && @.age)][0]",
+	"$[?(@.eggs)]",
+	"$[?(typeof @ == 'number' && @ == 40)][0]",
+	"$..friends[0][?(typeof @ == 'string')][0]",
 }
 var exampleJsonPathOutput [][]interface{}
 
@@ -216,6 +222,16 @@ func init() {
 		},
 		// $..friends[?(@.name == 'Bob Smith' || @.age > $.over-forty && @.name != 'hello @ world I come $.json.path in peace')]
 		{exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[1]},
+		// $..friends[*].name[?(@.length >= 14)]
+		{"Dwayne Johnson", "Elizabeth Swindon"},
+		// $[?(@.friends && @.name && @.age)]
+		{exampleMap["person"].(map[string]interface{})},
+		// $[?(@.eggs)]
+		{[]interface{}{}},
+		// $[?(typeof @ == 'number' && @ == 40)]
+		{40},
+		// $..friends[0][?(typeof @ == 'string')]
+		{"Jane Doe"},
 	}
 
 	// Fill out the absolute path expected outputs
@@ -266,7 +282,6 @@ func TestAbsolutePath(t *testing.T) {
 		for _, node := range values {
 			nodeVals = append(nodeVals, node.Value)
 		}
-		fmt.Println("values:", nodeVals, "expected:", exampleJsonPathOutput[i])
 		// Check if the values returned by GetAbsolutePaths is equal to the expected values
 		if !sameInterfaceSlice(nodeVals, exampleAbsolutePathOutput[i]) {
 			t.Errorf("%v and %v are not equal (absolute path: %v)", nodeVals, exampleAbsolutePathOutput[i], absolutePath)
@@ -274,7 +289,7 @@ func TestAbsolutePath(t *testing.T) {
 	}
 }
 
-func TestJsonPath(t *testing.T) {
+func TestJsonPathSelector(t *testing.T) {
 	// Iterate over all example JSON path expressions and see if it matches it's expected output
 	for i, jsonPath := range exampleJsonPathInput {
 		nodes, err := example.JsonPathSelector(jsonPath)
@@ -288,10 +303,13 @@ func TestJsonPath(t *testing.T) {
 		for _, node := range nodes {
 			nodeVals = append(nodeVals, node.Value)
 		}
-		fmt.Println("values:", nodeVals, "expected:", exampleJsonPathOutput[i])
 		// Use reflect.DeepEqual to check equality between expected and array of nodeVals
 		if !sameInterfaceSlice(nodeVals, exampleJsonPathOutput[i]) {
 			t.Errorf("%v and %v are not equal (JSON path: %s)", nodeVals, exampleJsonPathOutput[i], jsonPath)
 		}
 	}
+}
+
+func TestJsonPathSetter(t *testing.T) {
+
 }
