@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/andygello555/json-dom/jom"
 	"github.com/andygello555/json-dom/jom/json_map"
+	"github.com/andygello555/json-dom/utils"
 	"testing"
 )
 
@@ -74,7 +75,7 @@ var exampleAbsolutePathInput = []json_map.AbsolutePaths {
 // The output of GetAbsolutePaths after inputting exampleAbsolutePathInput absolute paths
 var exampleAbsolutePathOutput [][]interface{}
 
-// Json paths evaluate using the above example
+// Json paths to evaluate using the above example
 var exampleJsonPathInput = []string{
 	// Property selection
 	"$.person.name",
@@ -112,6 +113,29 @@ var exampleJsonPathInput = []string{
 	"$..friends[0][?(typeof @ == 'string')][0]",
 }
 var exampleJsonPathOutput [][]interface{}
+
+// Testing SetAbsolutePaths. We'll create a struct type to store a set of paths and a value to set to.
+type setAbsolutePathExample struct {
+	absolutePaths json_map.AbsolutePaths
+	value         interface{}
+}
+
+// Absolute path inputs and values to be evaluated on example above
+var exampleSetAbsolutePathInput = []setAbsolutePathExample {
+	// Set all ages in friends to 20
+	{
+		json_map.AbsolutePaths{
+			{
+				{json_map.First, nil},
+				{json_map.StringKey, "friends"},
+				{json_map.Wildcard, nil},
+				{json_map.StringKey, "age"},
+			},
+		},
+		20,
+	},
+}
+var exampleSetAbsolutePathOutput []map[string]interface{}
 
 func sameInterfaceSlice(x, y []interface{}) bool {
 	if len(x) != len(y) {
@@ -263,6 +287,44 @@ func init() {
 		},
 		{},
 	}
+
+	// Fill out expected outputs after running SetAbsolutePaths function on example with exampleSetAbsolutePathInput
+	exampleSetAbsolutePathOutput = []map[string]interface{} {
+		// {., "friends", *, "name"}
+		{
+			"person": map[string]interface{} {
+				"friends": []interface{} {
+					map[string]interface{}{
+						"name": "Jane Doe",
+						"age": int(20),
+					},
+					map[string]interface{}{
+						"name": "Bob Smith",
+						"age": int(20),
+					},
+					map[string]interface{}{
+						"name": "Dwayne Johnson",
+						"age": int(20),
+					},
+					map[string]interface{}{
+						"name": "Gary Twain",
+						"age": int(20),
+					},
+					map[string]interface{}{
+						"name": "Elizabeth Swindon",
+						"age": int(20),
+					},
+					map[string]interface{}{
+						"name": "Frank Bob",
+						"age": int(20),
+					},
+				},
+				"name": "John Smith",
+				"age": float64(18),
+			},
+			"over-forty": float64(40),
+		},
+	}
 }
 
 func TestAbsolutePath(t *testing.T) {
@@ -310,6 +372,30 @@ func TestJsonPathSelector(t *testing.T) {
 	}
 }
 
-func TestJsonPathSetter(t *testing.T) {
+func TestSetAbsolutePaths(t *testing.T) {
+	for i, exampleAbsolutePaths := range exampleSetAbsolutePathInput {
+		// Create a JsonMap and unmarshal the input file into it
+		jsonMap := jom.New()
+		if err := jsonMap.Unmarshal(exampleBytes); err != nil {
+			t.Errorf("Could not Unmarshal into JsonMap: %v", err)
+		}
 
+		// Set the current example value on the JSON map
+		err := jsonMap.SetAbsolutePaths(&exampleAbsolutePaths.absolutePaths, exampleAbsolutePaths.value)
+		if err != nil {
+			t.Errorf("The following error happened whilst setting an absolute path %s: %v", exampleAbsolutePaths.absolutePaths, err)
+			continue
+		}
+
+		// Handle JsonMap's with arrays at their roots
+		var insides interface{}
+		if jsonMap.Array {
+			insides = (*jsonMap.GetInsides())["array"]
+		} else {
+			insides = *jsonMap.GetInsides()
+		}
+
+		// Check for equality between jsonMap and expected output
+		utils.JsonMapEqualTest(t, insides, exampleSetAbsolutePathOutput[i], fmt.Sprintf("absolute paths: %v and value: %v", exampleAbsolutePaths.absolutePaths, exampleAbsolutePaths.value))
+	}
 }

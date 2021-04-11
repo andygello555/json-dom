@@ -112,8 +112,8 @@ type JsonMapInt interface {
 	GetInsides() *map[string]interface{}
 	GetAbsolutePaths(absolutePaths *AbsolutePaths) (values []*JsonPathNode, errs []error)
 	JsonPathSelector(jsonPath string) (out []*JsonPathNode, err error)
-	JsonPathSetter(jsonPath string, value interface{}) (err error)
 	Marshal() (out []byte, err error)
 	Run()
+	SetAbsolutePaths(absolutePaths *AbsolutePaths, value interface{}) (err error)
 	Unmarshal(jsonBytes []byte) (err error)
 }

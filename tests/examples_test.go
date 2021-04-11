@@ -2,12 +2,12 @@ package tests
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/andygello555/json-dom/code/js"
 	"github.com/andygello555/json-dom/jom"
 	"github.com/andygello555/json-dom/utils"
 	"io/ioutil"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 )
@@ -154,9 +154,7 @@ func TestExamples(t *testing.T) {
 				}
 
 				// Finally, compare the insides of the JsonMap with the Unmarshalled expected output from the example_out dir
-				if !reflect.DeepEqual(insides, example.out) {
-					t.Errorf("Evaluated input of %s does not match expected output: %v", example.name, example.out)
-				}
+				utils.JsonMapEqualTest(t, insides, example.out, fmt.Sprintf("\"%s\"", example.name))
 			}
 		}()
 	}
