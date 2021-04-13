@@ -1,0 +1,8 @@
+{
+  "person": {
+    "friends": [],
+    "name": "John Smith",
+    "age": 18
+  },
+  "over-forty": 40
+}

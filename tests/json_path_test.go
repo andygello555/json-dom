@@ -1,10 +1,14 @@
 package tests
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/andygello555/json-dom/jom"
 	"github.com/andygello555/json-dom/jom/json_map"
 	"github.com/andygello555/json-dom/utils"
+	"io/ioutil"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -120,8 +124,10 @@ type setAbsolutePathExample struct {
 	value         interface{}
 }
 
+const exampleSetAbsolutePathOutputLocation = "../assets/tests/set_abs_path_out/"
+
 // Absolute path inputs and values to be evaluated on example above
-var exampleSetAbsolutePathInput = []setAbsolutePathExample {
+var exampleSetAbsolutePathInput = []setAbsolutePathExample{
 	// Set all ages in friends to 20
 	{
 		json_map.AbsolutePaths{
@@ -132,10 +138,97 @@ var exampleSetAbsolutePathInput = []setAbsolutePathExample {
 				{json_map.StringKey, "age"},
 			},
 		},
-		20,
+		// hjson unmarshalls numerical values to float64 so we will cast every numerical value to that
+		float64(20),
+	},
+	{
+		json_map.AbsolutePaths{
+			{
+				{json_map.First, nil},
+				{json_map.StringKey, "friends"},
+				{json_map.IndexKey, 0},
+			},
+			{
+				{json_map.First, nil},
+				{json_map.StringKey, "friends"},
+				{json_map.IndexKey, 2},
+			},
+			{
+				{json_map.First, nil},
+				{json_map.StringKey, "friends"},
+				{json_map.IndexKey, 4},
+			},
+		},
+		map[string]interface{}{
+			"name": "Dumbledore",
+			"age":  "IDK",
+		},
+	},
+	{
+		json_map.AbsolutePaths{
+			{
+				{json_map.First, nil},
+				{json_map.StringKey, "friends"},
+				{json_map.Filter, "@.name.length >= 14"},
+				{json_map.StringKey, "name"},
+			},
+		},
+		"Long Name",
+	},
+	{
+		json_map.AbsolutePaths{
+			{
+				{json_map.First, nil},
+				{json_map.StringKey, "friends"},
+				{json_map.IndexKey, 0},
+				{json_map.Wildcard, nil},
+			},
+		},
+		nil,
+	},
+	{
+		json_map.AbsolutePaths{
+			{
+				{json_map.First, nil},
+				{json_map.StringKey, "friends"},
+				{json_map.IndexKey, 0},
+			},
+		},
+		nil,
+	},
+	{
+		json_map.AbsolutePaths{
+			{
+				{json_map.First, nil},
+				{json_map.StringKey, "friends"},
+				{json_map.StringKey, "age"},
+			},
+		},
+		nil,
+	},
+	{
+		json_map.AbsolutePaths{
+			{
+				{json_map.First, nil},
+				{json_map.StringKey, "friends"},
+				{json_map.Wildcard, nil},
+			},
+		},
+		nil,
+	},
+	{
+		json_map.AbsolutePaths{
+			{
+				{json_map.First, nil},
+				{json_map.StringKey, "friends"},
+				{json_map.Filter, "@.name.length >= 14"},
+			},
+		},
+		nil,
 	},
 }
-var exampleSetAbsolutePathOutput []map[string]interface{}
+
+var exampleSetAbsolutePathOutput []interface{}
 
 func sameInterfaceSlice(x, y []interface{}) bool {
 	if len(x) != len(y) {
@@ -289,41 +382,22 @@ func init() {
 	}
 
 	// Fill out expected outputs after running SetAbsolutePaths function on example with exampleSetAbsolutePathInput
-	exampleSetAbsolutePathOutput = []map[string]interface{} {
-		// {., "friends", *, "name"}
-		{
-			"person": map[string]interface{} {
-				"friends": []interface{} {
-					map[string]interface{}{
-						"name": "Jane Doe",
-						"age": int(20),
-					},
-					map[string]interface{}{
-						"name": "Bob Smith",
-						"age": int(20),
-					},
-					map[string]interface{}{
-						"name": "Dwayne Johnson",
-						"age": int(20),
-					},
-					map[string]interface{}{
-						"name": "Gary Twain",
-						"age": int(20),
-					},
-					map[string]interface{}{
-						"name": "Elizabeth Swindon",
-						"age": int(20),
-					},
-					map[string]interface{}{
-						"name": "Frank Bob",
-						"age": int(20),
-					},
-				},
-				"name": "John Smith",
-				"age": float64(18),
-			},
-			"over-forty": float64(40),
-		},
+	exampleSetAbsolutePathOutput = make([]interface{}, 0)
+	if files, err := ioutil.ReadDir(exampleSetAbsolutePathOutputLocation); err != nil {
+		panic(err)
+	} else {
+		for _, file := range files {
+			if strings.HasPrefix(file.Name(), "set_abs_path_out_") {
+				// Read the output file and Unmarshal to interface{} (array at root or object at root)
+				outFileBytes, err := ioutil.ReadFile(filepath.Join(exampleSetAbsolutePathOutputLocation, file.Name()))
+				var outMap interface{}
+				if err = json.Unmarshal(outFileBytes, &outMap); err != nil {
+					panic(err)
+				}
+
+				exampleSetAbsolutePathOutput = append(exampleSetAbsolutePathOutput, outMap)
+			}
+		}
 	}
 }
 
@@ -394,6 +468,8 @@ func TestSetAbsolutePaths(t *testing.T) {
 		} else {
 			insides = *jsonMap.GetInsides()
 		}
+		//b, _ := json.MarshalIndent(insides, "", "  ")
+		//fmt.Println(string(b))
 
 		// Check for equality between jsonMap and expected output
 		utils.JsonMapEqualTest(t, insides, exampleSetAbsolutePathOutput[i], fmt.Sprintf("absolute paths: %v and value: %v", exampleAbsolutePaths.absolutePaths, exampleAbsolutePaths.value))

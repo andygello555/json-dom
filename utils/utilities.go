@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"github.com/go-test/deep"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -21,6 +22,43 @@ func Range(start, end, step int) []int {
 	return s
 }
 
+// Removes the elements at the given indices in the given interface slice and returns a new slice.
+func RemoveElems(slice []interface{}, indices... int) []interface{} {
+	out := make([]interface{}, 0)
+	// Simple priority queue structure
+	sort.Ints(indices)
+	var currIdx int
+	currIdx, indices = indices[0], indices[1:]
+
+	for i, elem := range slice {
+		if i == currIdx {
+			if len(indices) > 0 {
+				currIdx, indices = indices[0], indices[1:]
+			}
+			continue
+		}
+		out = append(out, elem)
+	}
+	return out
+}
+
+// Clones a map deeply using recursion.
+func CopyMap(m map[string]interface{}) map[string]interface{} {
+	cp := make(map[string]interface{})
+	for k, v := range m {
+		vm, ok := v.(map[string]interface{})
+		if ok {
+			cp[k] = CopyMap(vm)
+		} else {
+			cp[k] = v
+		}
+	}
+
+	return cp
+}
+
+// Used in tests to check equality between two interface{}s.
+// NOTE this takes into account orderings.
 func JsonMapEqualTest(t *testing.T, actual, expected interface{}, forString string) {
 	if diff := deep.Equal(actual, expected); diff != nil {
 		var errB strings.Builder

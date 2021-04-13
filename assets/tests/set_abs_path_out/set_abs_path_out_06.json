@@ -1,0 +1,27 @@
+{
+  "person": {
+    "friends": [
+      {
+        "name": "Jane Doe"
+      },
+      {
+        "name": "Bob Smith"
+      },
+      {
+        "name": "Dwayne Johnson"
+      },
+      {
+        "name": "Gary Twain"
+      },
+      {
+        "name": "Elizabeth Swindon"
+      },
+      {
+        "name": "Frank Bob"
+      }
+    ],
+    "name": "John Smith",
+    "age": 18
+  },
+  "over-forty": 40
+}

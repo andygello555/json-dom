@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	exampleLocation     = "../assets/examples/"
-	exampleEvalLocation = "../assets/example_out/"
+	exampleLocation     = "../assets/tests/examples/"
+	exampleEvalLocation = "../assets/tests/example_out/"
 )
 
 // Lookup of all names that require a defer call to catch a panic

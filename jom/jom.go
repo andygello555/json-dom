@@ -99,7 +99,7 @@ func (jsonMap *JsonMap) GetInsides() *map[string]interface{} {
 // interpreter so (pretty much) any valid javascript can be written within them **as long as they return a boolean**.
 // If the returnIndices flag is true then the function will return the slice of indices (string/int) where the true
 // values (as decided by the filter exp) occur.
-func filterRunner(obj interface{}, filterExp []byte, jsonMap map[string]interface{}, mapType bool, returnIndices bool) (truers []interface{}, err error) {
+func filterRunner(obj interface{}, filterExp []byte, jsonMap map[string]interface{}, mapType bool, returnIndices bool) (truers interface{}, err error) {
 	// For Filters we first have to replace all all @ chars with the current node that has been Marshalled
 	// into JSON then JSON.parse-d. And we have to also replace all the JSON paths with calculated literals
 	stringLiterals := regexp.MustCompile("['\"]([^\\\\\"']|\\\\.)*['\"]")
@@ -205,9 +205,18 @@ func filterRunner(obj interface{}, filterExp []byte, jsonMap map[string]interfac
 		}
 	}
 
-	// Set up the slice which stores all the nodes where the expression evaluates to true as well as the VM
-	// to run everything inside
-	truers = make([]interface{}, 0)
+	// Set up the truers slice to store all truthy values within the map/arr and setup the VM to run everything inside
+	if !returnIndices {
+		truers = make([]interface{}, 0)
+	} else {
+		// If we are returning indices then we will create the array according to whether we are going to return string
+		// keys or numerical indices
+		if mapType {
+			truers = make([]string, 0)
+		} else {
+			truers = make([]int, 0)
+		}
+	}
 	vm := otto.New()
 
 	// Setup up an anonymous function which will make up our for loop body which iterates over our obj
@@ -289,10 +298,13 @@ func filterRunner(obj interface{}, filterExp []byte, jsonMap map[string]interfac
 		//fmt.Println("expression at node", node, "is", currentExpression, "=", truer)
 		// Otherwise add the node to the truers slice if the returned value is true
 		if truer {
-			if !returnIndices {
-				truers = append(truers, node)
-			} else {
-				truers = append(truers, nodeIdx)
+			switch truers.(type) {
+			case []interface{}:
+				truers = append(truers.([]interface{}), node)
+			case []string:
+				truers = append(truers.([]string), nodeIdx.(string))
+			case []int:
+				truers = append(truers.([]int), nodeIdx.(int))
 			}
 		}
 		return nil
@@ -560,8 +572,9 @@ func (jsonMap *JsonMap) GetAbsolutePaths(absolutePaths *json_map.AbsolutePaths) 
 }
 
 // Given the list of absolute paths for a JsonMap: will set the values pointed to by the given JSON path to be the
-// given value. To avoid race conditions this routine runs single threaded which means this operation can be
-// significantly slower than getting values. It's important to bear this in mind.
+// given value. If a value of nil is given the structures pointed to by the absolute paths will be deleted.
+// To avoid race conditions this routine runs single threaded which means this operation can be significantly slower
+// than getting values. It's important to bear this in mind.
 func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, value interface{}) (err error) {
 	// Create a type for errors which will be used in discerning caught panics later on
 	type recursionError struct {
@@ -575,7 +588,10 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 			// Pop the next path key
 			var key json_map.AbsolutePathKey
 			key, remainingPath = remainingPath[0], remainingPath[1:]
-			lastKey := len(remainingPath) == 0
+
+			// Some precomputed flags for readability
+			lastKey := len(remainingPath) == 0   // Whether we are on the last key in the path and should set the value
+			deleteVal := value == nil && lastKey // Whether we are on the last key AND value is nil so we should delete
 			//fmt.Println("on tree:", currTree, "key:", key, "remaining path:", remainingPath)
 
 			// A simple setter function which returns the value needed for the given index depending on whether we are
@@ -593,6 +609,34 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 				return value
 			}
 
+			// Specific setters for maps and arrays. Takes a reference to a map/array and modifies in place
+			setterMap := func(mRef *map[string]interface{}, key string) {
+				if deleteVal {
+					// Delete the key using the delete function
+					delete(*mRef, key)
+				} else {
+					(*mRef)[key] = setter(*mRef, key)
+				}
+			}
+			// Takes an array of indices so that multiple indices can be deleted at once so that indices aren't messed
+			// up between deletions
+			setterArr := func(arrRef *[]interface{}, indices... int) {
+				// If the length of indices is 0 then we assume that the caller wants all the indices
+				if len(indices) == 0 {
+					indices = utils.Range(0, len(*arrRef) - 1, 1)
+				}
+
+				if deleteVal {
+					// Delete indices using the RemoveElems from utils
+					*arrRef = utils.RemoveElems(*arrRef, indices...)
+				} else {
+					// We have to iterate through all indices and set the according values
+					for _, idx := range indices {
+						(*arrRef)[idx] = setter(*arrRef, idx)
+					}
+				}
+			}
+
 			// StartEnd KeyTypes must be within a Slice key type so throw an error if so
 			// NOTE all errors will panic as it makes dealing with them easier due to the recursive nature of the lookup
 			if key.KeyType == json_map.StartEnd {
@@ -602,6 +646,7 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 			// Check the type of the current value and take the according value
 			switch currTree.(type) {
 			case map[string]interface{}:
+				// A "frozen" copy of the current value as a map which will not be modified
 				m := currTree.(map[string]interface{})
 				switch key.KeyType {
 				case json_map.StringKey:
@@ -609,16 +654,16 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 						// If the key does not exist and we are not on the last key in the path then we cannot continue so we throw an error
 						panic(recursionError{fmt.Sprintf("Key '%v' does not exist in map", key.Value)})
 					}
-					// Otherwise we set the value accordingly using the setter func
-					currTree.(map[string]interface{})[key.Value.(string)] = setter(m, key.Value)
+					setterMap(&m, key.Value.(string))
 				case json_map.IndexKey | json_map.Slice:
 					panic(recursionError{fmt.Sprintf("Cannot access map %v with numerical key %v", currTree, key.Value)})
 				case json_map.Wildcard:
-					for k := range m {
-						currTree.(map[string]interface{})[k] = setter(m, k)
+					// We always iterate through a copy of the map as we might delete a key-value pair from the original map
+					for k := range currTree.(map[string]interface{}) {
+						setterMap(&m, k)
 					}
 				case json_map.Filter:
-					var newSubtreeIndices []interface{}
+					var newSubtreeIndices interface{}
 					// Using the filterRunner function we can run the filter on the values of each key in the map
 					filterExp := []byte(key.Value.(string))
 					newSubtreeIndices, err = filterRunner(m, filterExp, jsonMap.insides, true, true)
@@ -626,8 +671,8 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 						panic(recursionError{err.Error()})
 					}
 					// Then we iterate through all truthy indices and recurse down their values
-					for _, k := range newSubtreeIndices {
-						currTree.(map[string]interface{})[k.(string)] = setter(m, k)
+					for _, k := range newSubtreeIndices.([]string) {
+						setterMap(&m, k)
 					}
 				case json_map.First:
 					// We sort the keys alphabetically then set the value of the first
@@ -646,21 +691,25 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 					}
 					// Otherwise sort the strings and take the value of the first key as the new current value
 					sort.Strings(keys)
-					currTree.(map[string]interface{})[keys[0]] = setter(m, keys[0])
+					setterMap(&m, keys[0])
 				default:
 					panic(recursionError{fmt.Sprintf("AbsolutePathKey of type: %v is unrecognised", key.KeyType)})
 				}
+				// Finally set the current tree to the copy of the value as a map
+				currTree = m
 			case []interface{}:
 				arr := currTree.([]interface{})
 				switch key.KeyType {
 				case json_map.StringKey:
 					// When given a string key we will iterate over all elements seeing if we have a map which we can test
 					// if it contains the required StringKey
-					for i, item := range arr {
+					for i, item := range currTree.([]interface{}) {
 						switch item.(type) {
 						case map[string]interface{}:
-							if _, ok := item.(map[string]interface{})[key.Value.(string)]; ok {
-								currTree.([]interface{})[i].(map[string]interface{})[key.Value.(string)] = setter(item, key.Value)
+							mapItem := item.(map[string]interface{})
+							if _, ok := mapItem[key.Value.(string)]; ok {
+								setterMap(&mapItem, key.Value.(string))
+								arr[i] = mapItem
 							}
 						default:
 							continue
@@ -672,14 +721,12 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 						panic(recursionError{fmt.Sprintf("Index (%d) is out of bounds for array of length %d", i, len(arr))})
 					}
 					//fmt.Println("Getting index:", i, "from", arr, "=", arr[i])
-					currTree.([]interface{})[i] = setter(arr, i)
+					setterArr(&arr, i)
 				case json_map.Wildcard:
 					// If a wildcard then we need to iterate over array and recurse down each element
-					for i := range arr {
-						currTree.([]interface{})[i] = setter(arr, i)
-					}
+					setterArr(&arr)
 				case json_map.Filter:
-					var newSubtreeIndices []interface{}
+					var newSubtreeIndices interface{}
 					// Using the filterRunner function we can run the filter on the elements of the array
 					filterExp := []byte(key.Value.(string))
 					newSubtreeIndices, err = filterRunner(arr, filterExp, jsonMap.insides, false, true)
@@ -687,9 +734,7 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 						panic(recursionError{err.Error()})
 					}
 					// Then we iterate through all truthy indices and recurse down their values
-					for _, i := range newSubtreeIndices {
-						currTree.([]interface{})[i.(int)] = setter(arr, i)
-					}
+					setterArr(&arr, newSubtreeIndices.([]int)...)
 				case json_map.First:
 					panic(recursionError{"cannot recurse into an array"})
 				case json_map.Slice:
@@ -727,12 +772,12 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 					}
 
 					// Then we iterate through a range of slice indices
-					for _, i := range utils.Range(sliceIndices[0], sliceIndices[1] - 1, 1) {
-						currTree.([]interface{})[i] = setter(arr, i)
-					}
+					setterArr(&arr, utils.Range(sliceIndices[0], sliceIndices[1] - 1, 1)...)
 				default:
 					panic(recursionError{fmt.Sprintf("AbsolutePathKey of type: %v is unrecognised", key.KeyType)})
 				}
+				// Current tree set to the modified array
+				currTree = arr
 			default:
 				panic(recursionError{fmt.Sprintf("Cannot access key %v of type %s", key, reflect.TypeOf(currTree).Name())})
 			}

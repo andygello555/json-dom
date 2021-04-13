@@ -1,0 +1,32 @@
+{
+  "person": {
+    "friends": [
+      {
+        "name": "Dumbledore",
+        "age": "IDK"
+      },
+      {
+        "name": "Bob Smith",
+        "age": 55
+      },
+      {
+        "name": "Dumbledore",
+        "age": "IDK"
+      },
+      {
+        "name": "Gary Twain",
+        "age": 40
+      },
+      {
+        "name": "Dumbledore",
+        "age": "IDK"
+      },
+      {
+        "name": "Frank Bob"
+      }
+    ],
+    "name": "John Smith",
+    "age": 18
+  },
+  "over-forty": 40
+}

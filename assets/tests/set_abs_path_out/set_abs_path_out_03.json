@@ -1,0 +1,32 @@
+{
+  "person": {
+    "friends": [
+      {
+        "name": "Jane Doe",
+        "age": 24
+      },
+      {
+        "name": "Bob Smith",
+        "age": 55
+      },
+      {
+        "name": "Long Name",
+        "age": 36
+      },
+      {
+        "name": "Gary Twain",
+        "age": 40
+      },
+      {
+        "name": "Long Name",
+        "age": 21
+      },
+      {
+        "name": "Frank Bob"
+      }
+    ],
+    "name": "John Smith",
+    "age": 18
+  },
+  "over-forty": 40
+}

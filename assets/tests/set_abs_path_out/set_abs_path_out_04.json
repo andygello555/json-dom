@@ -1,0 +1,29 @@
+{
+  "person": {
+    "friends": [
+      {},
+      {
+        "name": "Bob Smith",
+        "age": 55
+      },
+      {
+        "name": "Dwayne Johnson",
+        "age": 36
+      },
+      {
+        "name": "Gary Twain",
+        "age": 40
+      },
+      {
+        "name": "Elizabeth Swindon",
+        "age": 21
+      },
+      {
+        "name": "Frank Bob"
+      }
+    ],
+    "name": "John Smith",
+    "age": 18
+  },
+  "over-forty": 40
+}
