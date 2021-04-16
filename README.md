@@ -240,11 +240,12 @@ Scripts are run using the [otto](https://pkg.go.dev/github.com/robertkrimen/otto
 
 #### Builtin functions
 
-| Name              | Params      | Returns | Description                     |
-|:------------------|:------------|:--------|:--------------------------------|
-| `printlnExternal` | `...Object` | Nothing | Legacy version of `console.log` |
-| `console.log`     | `...Object` | Nothing | Will print to stdout            |
-| `console.error`   | `...Object` | Nothing | Will print to stderr            |
+| Name                    | Params      | Returns   | Description                                                                                                                       |
+|:------------------------|:------------|:----------|:----------------------------------------------------------------------------------------------------------------------------------|
+| `printlnExternal`       | `...Object` | Nothing   | Legacy version of `console.log`                                                                                                   |
+| `console.log`           | `...Object` | Nothing   | Will print to stdout                                                                                                              |
+| `console.error`         | `...Object` | Nothing   | Will print to stderr                                                                                                              |
+| `json.jsonPathSelector` | `String`    | `NodeSet` | Given a JSON path can get the values pointed to by the path using `getValues()` or set values by using `setValues(value Object)`. |
 
 #### Builtin symbols
 
@@ -254,3 +255,17 @@ Scripts are run using the [otto](https://pkg.go.dev/github.com/robertkrimen/otto
 | `json.trail`      | Object | Contains a replica of the key-value pairs of the JSON at the script's scope level. Any changes to it will be reflected in the final output JSON.                                                                               |
 | `json.scriptPath` | String | The JSON path to the current scope. Mostly just used by the `console` object to print out where a print came from.                                                                                                             |
 | `console`         | Object | The standard `console` object you know and love. Currently, the only supported methods are `log` and `error`. Both print the JSON path location to the call. The former will print to stdout. The latter will print to stderr. |
+
+## JSON path notes
+
+The JSON path implementation is fairly similar to the one outlined [here](https://support.smartbear.com/alertsite/docs/monitors/api/endpoint/jsonpath.html). The only real differences is with Recursive Descent expressions (e.g. `$..friends`). In this implementation `..` acts as a "first" descent where it will descend down the alphabetically first key which has a value that is either an object or an array.<br/>
+
+The main functions/symbols relating to JSON path functionality:
+- `json.jsonPathSelector(String jsonPath) -> NodeSet`: The main function to call to construct your `NodeSet` object
+- `NodeSet` object
+  - `_absolutePaths`: A list of objects which represent the absolute paths which the JSON path points to. Each absolute path comprises of the following properties:
+    - `typeId`: The ID of the type (carbon copy of the values of `AbsolutePathKeyType`s)
+    - `typeStr`: The name of the type (copy of the constant names of `AbsolutePathKeyType`s)
+    - `key`: The value of the current absolute path key
+  - `getValues() -> Array[Node]`: Returns the values at the nodes pointed to by the JSON path which was used when constructing the `NodeSet`
+  - `setValues(value Any)`: Sets the values at the nodes pointed to by the JSON path which was used when constructing the `NodeSet` to the given value. If the value given is `null` then the values pointed to will be deleted.
