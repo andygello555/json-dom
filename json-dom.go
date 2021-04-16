@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	_ "github.com/andygello555/json-dom/code/js"
 	"github.com/andygello555/json-dom/jom"
 	"github.com/andygello555/json-dom/utils"
 	"io/ioutil"

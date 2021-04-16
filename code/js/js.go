@@ -3,14 +3,22 @@ package js
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/andygello555/json-dom/code"
+	"github.com/andygello555/json-dom/jom"
 	"github.com/andygello555/json-dom/jom/json_map"
 	"github.com/andygello555/json-dom/utils"
 	"github.com/robertkrimen/otto"
 	"io"
 	"os"
+	"reflect"
 	"strings"
 	"time"
 )
+
+// Register this language in the code package
+func init() {
+	code.RegisterLang("js", RunScript)
+}
 
 // These can be set when testing to check output
 var ExternalConsoleLogStdout io.Writer = os.Stdout
@@ -53,6 +61,38 @@ func traverseObject(object *otto.Object) *map[string]interface{} {
 	return &objectMap
 }
 
+func toGo(value otto.Value) (out interface{}) {
+	var err error
+	if value.IsDefined() {
+		switch true {
+		case value.IsBoolean():
+			out, _ = value.ToBoolean()
+		case value.IsString():
+			out, _ = value.ToString()
+		case value.IsNumber():
+			out, err = value.ToFloat()
+			if err != nil {
+				out, err = value.ToInteger()
+				if err != nil {
+					panic(err)
+				}
+			}
+		case value.IsObject():
+			obj := value.Object()
+			out = traverseObject(obj)
+		case value.IsNull():
+			out = nil
+		case value.IsFunction():
+			fallthrough
+		default:
+			out = value.Class()
+		}
+	} else if value.IsUndefined() {
+		out = nil
+	}
+	return out
+}
+
 // Composes a string to print from the given otto.FunctionCall
 func composePrint(call otto.FunctionCall) *strings.Builder {
 	// Print the caller location
@@ -73,33 +113,11 @@ func composePrint(call otto.FunctionCall) *strings.Builder {
 	argList := call.ArgumentList
 
 	for i, arg := range argList {
-		if arg.IsDefined() {
-			if arg.IsBoolean() {
-				boolean, _ := arg.ToBoolean()
-				_, _ = fmt.Fprintf(&b, "%t", boolean)
-			} else if arg.IsString() {
-				str, _ := arg.ToString()
-				_, _ = fmt.Fprintf(&b, "%s", str)
-			} else if arg.IsNumber() {
-				float, err := arg.ToFloat()
-				if err != nil {
-					integer, err := arg.ToInteger()
-					if err != nil {
-						panic(err)
-					}
-					_, _ = fmt.Fprintf(&b, "%d", integer)
-				}
-				_, _ = fmt.Fprintf(&b, "%g", float)
-			} else if arg.IsObject() {
-				obj := arg.Object()
-				objMap := traverseObject(obj)
-				_, _ = fmt.Fprintf(&b, "%v", *objMap)
-			} else {
-				class := arg.Class()
-				_, _ = fmt.Fprint(&b, class)
-			}
-		} else {
+		val := toGo(arg)
+		if val == nil {
 			_, _ = fmt.Fprint(&b, "undefined")
+		} else {
+			_, _ = fmt.Fprintf(&b, "%v", val)
 		}
 
 		// Add space between args
@@ -115,8 +133,199 @@ func composePrint(call otto.FunctionCall) *strings.Builder {
 	return &out
 }
 
+// Given a JSON path will return a "NodeSet" object which contains the absolute paths to all values denoted by the JSON
+// path as well as getter and setter functions.
+//
+// 1. Function will stringify json.trail within the VM and unmarshall to a new JsonMap.
+// 2. The JSON path will be parsed into json_map.AbsolutePaths and GetAbsolutePaths will be called
+// 3. json_map.AbsolutePaths will be converted into JS values
+// 4. The returned object will be constructed (_absolutePaths, getValues, setValues)
 func jsonPathSelector(call otto.FunctionCall) otto.Value {
-	return otto.Value{}
+	var err error
+	vm := call.Otto
+
+	throw := func(message string) {
+		panic(vm.MakeCustomError("JSONPathError", message))
+	}
+
+	// Check number of arguments and argument types
+	if len(call.ArgumentList) > 1 || !call.Argument(0).IsString() {
+		throw("jsonPathSelector takes a single string argument")
+	}
+	jsonPath, _ := call.Argument(0).ToString()
+
+	// We set up a function to retrieve the JsonMap so we can retrieve the most up to date version of json.trail
+	getJsonMap := func(vm *otto.Otto) *jom.JsonMap {
+		// Stringify the json.trail object
+		var trailStringValue otto.Value
+		trailStringValue, err = vm.Run(fmt.Sprintf("JSON.stringify(%s.trail)", utils.JOMVariableName))
+		if err != nil || trailStringValue.IsUndefined() || trailStringValue.IsNull() || !trailStringValue.IsString() {
+			if err != nil {
+				throw(err.Error())
+			}
+			throw(fmt.Sprintf("\"%s.trail\" is not JSON stringifiable. It is \"%v\".", utils.JOMVariableName, trailStringValue))
+		}
+		// Marshall the JSON string into a JsonMap
+		trailString, _ := trailStringValue.ToString()
+		jMap := jom.New()
+		err = jMap.Unmarshal([]byte(trailString))
+		if err != nil {
+			throw(fmt.Sprintf("cannot Unmarshall \"%s\" into a JsonMap", trailString))
+		}
+		return jMap
+	}
+
+	getAbsPaths := func(absolutePaths *json_map.AbsolutePaths, jMap *jom.JsonMap) []*json_map.JsonPathNode {
+		values, errs := jMap.GetAbsolutePaths(absolutePaths)
+		if errs != nil {
+			throw(utils.JsonPathError.FillFromErrors(errs).Error())
+		}
+		return values
+	}
+
+	// Then we will parse the JSON path
+	var absolutePaths json_map.AbsolutePaths
+	absolutePaths, err = utils.ParseJsonPath(jsonPath)
+	if err != nil {
+		throw(err.Error())
+	}
+
+	// Set up a temporary vm which we will use to construct the NodeSet
+	vmTemp := otto.New()
+
+	// Temp function to push a value to an array stored in the given variable name.
+	// This will first marshall the value into a JSON value in Go then parse the []byte to the VM which will use
+	// JSON.parse to parse the value and then push it to the array of the given name.
+	pushValue := func(arrName string, value interface{}) {
+		var valueStr []byte
+		valueStr, err = json.Marshal(value)
+		if err != nil {
+			throw(fmt.Sprintf("cannot Marshal value: \"%v\"", value))
+		}
+		// Then push the value to the nodeSet array within the VM
+		currentName := fmt.Sprintf("%sCurrStr", arrName)
+		_ = vmTemp.Set(currentName, string(valueStr))
+		_, err = vmTemp.Run(fmt.Sprintf("%s.push(JSON.parse(%s))", arrName, currentName))
+		if err != nil {
+			throw(fmt.Sprintf("could not push current node: \"%v\", to %s", string(valueStr), arrName))
+		}
+	}
+
+	var setupKeyObject func(path json_map.AbsolutePathKey) map[string]interface{}
+	setupKeyObject = func(path json_map.AbsolutePathKey) map[string]interface{} {
+		absolutePathKeyMap := make(map[string]interface{})
+		absolutePathKeyMap["typeId"]   = path.KeyType
+		absolutePathKeyMap["typeName"] = json_map.AbsolutePathKeyTypeNames[path.KeyType]
+		switch path.KeyType {
+		case json_map.Slice:
+			// In cases of slices we have to setup a new array
+			_, _ = vmTemp.Run("sliceArray = []")
+			for _, slice := range path.Value.([]json_map.AbsolutePathKey) {
+				pushValue("sliceArray", setupKeyObject(slice))
+			}
+			absolutePathKeyMap["key"], _ = vmTemp.Get("sliceArray")
+		default:
+			absolutePathKeyMap["key"] = path.Value
+		}
+		return absolutePathKeyMap
+	}
+
+	// Create a node set map which will store the object we need to return
+	nodeSetMap := make(map[string]interface{})
+
+	_, _ = vmTemp.Run("absoluteValues = []")
+	for _, paths := range absolutePaths {
+		_, _ = vmTemp.Run("currentPath = []")
+		for _, path := range paths {
+			pathMap := setupKeyObject(path)
+			var value otto.Value
+			value, err = vmTemp.ToValue(pathMap)
+			if err != nil {
+				throw(err.Error())
+			}
+			_ = vmTemp.Set("currentKey", value)
+			// Append to array
+			_, _ = vmTemp.Run("currentPath.push(currentKey)")
+		}
+		// Append the current path to the absolute paths array
+		_, _ = vmTemp.Run("absoluteValues.push(currentPath)")
+	}
+	nodeSetMap["_absolutePaths"], _ = vmTemp.Get("absoluteValues")
+
+	// Set getter and setter funcs
+	nodeSetMap["getValues"] = func(call otto.FunctionCall) otto.Value {
+		// Get the most "up to date" json map from json.trail
+		jsonMap := getJsonMap(call.Otto)
+		_, _ = vmTemp.Run("nodeValues = []")
+		nodes := getAbsPaths(&absolutePaths, jsonMap)
+
+		// Expand the first element if we only have one element and its an array
+		if len(nodes) == 1 {
+			switch nodes[0].Value.(type) {
+			case []interface{}:
+				expandedNodes := make([]*json_map.JsonPathNode, 0)
+				for _, node := range nodes[0].Value.([]interface{}) {
+					expandedNodes = append(expandedNodes, &json_map.JsonPathNode{
+						Absolute: nodes[0].Absolute,
+						Value:    node,
+					})
+				}
+				nodes = expandedNodes
+			}
+		}
+
+		for _, value := range nodes {
+			pushValue("nodeValues", value.Value)
+		}
+		nodeValues, _ := vmTemp.Get("nodeValues")
+		return nodeValues
+	}
+
+	nodeSetMap["setValues"] = func(call otto.FunctionCall) otto.Value {
+		// Get the most "up to date" json map from json.trail
+		jsonMap := getJsonMap(call.Otto)
+		if len(call.ArgumentList) == 0 || len(call.ArgumentList) > 1 {
+			throw("setValue takes a single argument")
+		}
+		value := call.Argument(0)
+		valueGo := toGo(value)
+
+		// Because the value returned by toGo can indeed by a pointer we need to do some suave reflect method calls to
+		// get the indirect value of the pointer if the Kind of value returned is indeed a pointer
+		if reflect.ValueOf(valueGo).Kind() == reflect.Ptr {
+			valueGo = reflect.Indirect(reflect.ValueOf(valueGo)).Interface()
+		}
+
+		// Then we call SetAbsolutePaths
+		// NOTE: this is referencing the absolute paths from outside the scope of this function but this doesn't matter
+		//       because if the user has changed the JSON structure for the worse then its kinda their fault for using
+		//       an out of date NodeSet object
+		err = jsonMap.SetAbsolutePaths(&absolutePaths, valueGo)
+		if err != nil {
+			throw(err.Error())
+		}
+
+		// Then we update the current json.trail object with the createJom function which will recreate the jom
+		var trail otto.Value
+		trail, err = createJom(jsonMap)
+		if err != nil {
+			throw("Could not JOM-ify modified JsonMap")
+		}
+
+		_ = call.Otto.Set(utils.ModifiedTrailValueVarName, trail)
+		_, err = call.Otto.Run(fmt.Sprintf("json[\"trail\"] = %s", utils.ModifiedTrailValueVarName))
+		if err != nil {
+			throw(err.Error() + "gello")
+		}
+		return otto.NullValue()
+	}
+
+	var nodeSet otto.Value
+	nodeSet, err = vm.ToValue(nodeSetMap)
+	if err != nil {
+		throw(fmt.Sprintf("could not convert \"%v\" to otto value", nodeSetMap))
+	}
+	return nodeSet
 }
 
 // Struct representing a builtin function that can be called from within the JS environment

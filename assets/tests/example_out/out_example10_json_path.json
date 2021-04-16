@@ -1,0 +1,46 @@
+{
+    "JohnSmith": {
+        "friends": [
+            {
+                "name": "Molly Little",
+                "age": 42
+            },
+            {
+                "name": "Daniel Booth",
+                "age": 62
+            },
+            {
+                "name": "Oscar Hodgson",
+                "age": 84
+            },
+            {
+                "name": "Libby Ross",
+                "age": 20
+            },
+            {
+                "name": "Ava Forster",
+                "age": 20
+            }
+        ]
+    },
+    "JaneDoe": {
+        "friends": [
+            {
+                "name": "Louis Warren",
+                "age": 20
+            },
+            {
+                "name": "Libby Willis",
+                "age": 83
+            },
+            {
+                "name": "Mohammad Sutton",
+                "age": 81
+            },
+            {
+                "name": "Katie Cole",
+                "age": 49
+            }
+        ]
+    }
+}

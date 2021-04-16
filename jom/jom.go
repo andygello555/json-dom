@@ -833,7 +833,7 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 // This function supports the following JSON path syntax
 // - Property selection: .property BUT NOT ['property']
 // - Element selection: [n], [x, y, z]
-// - First descent: ..property (different to JSON path spec .. descends down the alphabetically first map/array)
+// - First descent: ..property (different to JSON path spec ".." descends down the alphabetically first map/array)
 // - Wildcards: .property.*, [*]
 // - List slicing: [start:end], [start:], [-start:], [:end], [:-end]
 // - Filter expressions: [?(expression)]
@@ -842,7 +842,7 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 // If a filter expression can be evaluated in JS and returns a boolean value then it counts as a valid filter expression
 func (jsonMap *JsonMap) JsonPathSelector(jsonPath string) (out []*json_map.JsonPathNode, err error) {
 	out = make([]*json_map.JsonPathNode, 0)
-	paths, err := utils.ParseJsonPath(jsonPath, jsonMap)
+	paths, err := utils.ParseJsonPath(jsonPath)
 	if err != nil {
 		return nil, err
 	}
@@ -853,6 +853,19 @@ func (jsonMap *JsonMap) JsonPathSelector(jsonPath string) (out []*json_map.JsonP
 		return nil, utils.JsonPathError.FillFromErrors(errs)
 	}
 	return values, nil
+}
+
+// Given a valid JSON path: will set the values pointed to by the JSON path to be the value given. If nil is given as
+// the value then the pointed to elements will be deleted.
+// Essentially just a wrapper for utils.ParseJsonPath -> SetAbsolutePaths
+func (jsonMap *JsonMap) JsonPathSetter(jsonPath string, value interface{}) (err error) {
+	var paths json_map.AbsolutePaths
+	paths, err = utils.ParseJsonPath(jsonPath)
+	if err != nil {
+		return err
+	}
+	err = jsonMap.SetAbsolutePaths(&paths, value)
+	return err
 }
 
 // Check if the given string contains a json-dom script.

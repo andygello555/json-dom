@@ -1,0 +1,94 @@
+{
+    JohnSmith: {
+        friends: [
+            {
+                name: Molly Little
+                age: 42
+            }
+            {
+                name: Daniel Booth
+                age: 62
+            }
+            {
+                name: Oscar Hodgson
+                age: 84
+            }
+            {
+                name: Libby Ross
+            }
+            Ava Forster
+        ]
+    }
+    JaneDoe: {
+        friends: [
+            {
+                name: Jayden Welch
+            }
+            Louis Warren
+            {
+                name: Libby Willis
+                age: 83
+            }
+            {
+                name: Mohammad Sutton
+                age: 81
+            }
+            {
+                name: Katie Cole
+                age: 49
+            }
+        ]
+    }
+    default_age: 20
+    script:
+        '''#//!js
+        console.log(json.jsonPathSelector("$.JohnSmith.friends[0, 2, 4]"));
+        console.log(json.jsonPathSelector("$.JaneDoe.friends[1:3]"));
+
+        // This just normalises all elements within the "friends" key's value to all have a similar "name" and "age"
+        // structure by utilising the JSON path filter expressions
+        var people = ['JohnSmith', 'JaneDoe']
+        for (var p=0; p<people.length; p++) {
+            var person = people[p];
+            var basePath = "$." + person + ".friends";
+
+            var stringSet = json.jsonPathSelector(basePath + "[?(typeof @ == 'string')]");
+            var nodes = stringSet.getValues()
+            console.log(nodes, nodes.length);
+            for (var n=0; n<nodes.length; n++) {
+                var node = nodes[n];
+                var normalised = {};
+
+                normalised['name'] = node;
+                normalised['age'] = json.trail.default_age;
+
+                var findSet = json.jsonPathSelector(basePath + "[?(@ == \'" + node + "\')]");
+                console.log(node, findSet, normalised);
+                findSet.setValues(normalised);
+            }
+
+            var objectSet = json.jsonPathSelector(basePath + "[?(typeof @ == 'object')]");
+            nodes = objectSet.getValues()
+            console.log(nodes, nodes.length);
+            for (var n=0; n<nodes.length; n++) {
+                var node = nodes[n];
+                var normalised = node;
+
+                if (!!!(node.name)) {
+                    normalised['name'] = "Bob bob";
+                }
+                if (!!!(node.age)) {
+                    normalised['age'] = json.trail.default_age;
+                }
+
+                var findSet = json.jsonPathSelector(basePath + "[?(@.name == \'" + node.name + "\')]");
+                console.log(node, findSet, normalised);
+                findSet.setValues(normalised);
+            }
+        }
+
+        // We can delete the values pointed to by the JSON path by setting values to null
+        json.jsonPathSelector("$..friends[0]").setValues(null);
+        delete json.trail.default_age;
+        '''
+}

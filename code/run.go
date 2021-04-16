@@ -2,7 +2,6 @@ package code
 
 import (
 	"fmt"
-	"github.com/andygello555/json-dom/code/js"
 	"github.com/andygello555/json-dom/jom/json_map"
 	"github.com/andygello555/json-dom/utils"
 )
@@ -14,16 +13,17 @@ type SupportedLang struct {
 	runScript   func(script string, jsonMap json_map.JsonMapInt) (data json_map.JsonMapInt, err error)
 }
 
-func New(shebangName string, runScript func(script string, jsonMap json_map.JsonMapInt) (data json_map.JsonMapInt, err error)) *SupportedLang {
-	return &SupportedLang{
+// All the scripting languages currently supported.
+var SupportedLangs = make(map[string]*SupportedLang)
+
+// Registers a new SupportedLang to the SupportedLangs map.
+// Every supported language package should call this within their init().
+func RegisterLang(shebangName string, runScript func(script string, jsonMap json_map.JsonMapInt) (data json_map.JsonMapInt, err error)) bool {
+	SupportedLangs[shebangName] = &SupportedLang{
 		shebangName: shebangName,
 		runScript:   runScript,
 	}
-}
-
-// All the scripting languages currently supported.
-var SupportedLangs = map[string]*SupportedLang{
-	"js": New("js", js.RunScript),
+	return true
 }
 
 // Run the given script in the given script environment.
@@ -33,5 +33,6 @@ func Run(scriptLang string, script string, jsonMap json_map.JsonMapInt) (data js
 	if supportedLang, ok := SupportedLangs[scriptLang]; ok {
 		return supportedLang.runScript(script, jsonMap)
 	}
+	fmt.Println(SupportedLangs)
 	return nil, utils.UnsupportedScriptLang.FillError(scriptLang, fmt.Sprintf(utils.ScriptErrorFormatString, jsonMap.GetCurrentScopePath(), script))
 }

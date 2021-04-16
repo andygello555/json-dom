@@ -14,6 +14,7 @@ const (
 	AnonymousScriptPath           = "<anonymous>"
 	CurrentNodeLiteralVarName     = "__currentNodeLiteral__"
 	CurrentNodeValueVarName       = "__currentNode__"
+	ModifiedTrailValueVarName     = "__modifiedTrail__"
 )
 
 // These are global variables that can be changed

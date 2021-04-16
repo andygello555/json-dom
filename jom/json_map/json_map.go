@@ -19,7 +19,7 @@ const (
 
 // Map of absolute key type values to their corresponding names
 // Used in String method of AbsolutePathKey
-var absolutePathKeyTypeNames = map[AbsolutePathKeyType]string {
+var AbsolutePathKeyTypeNames = map[AbsolutePathKeyType]string {
 	StringKey: "StringKey",
 	IndexKey:  "IndexKey",
 	Wildcard:  "Wildcard",
@@ -36,15 +36,17 @@ type AbsolutePathKey struct {
 }
 
 func (apk AbsolutePathKey) String() string {
-	return fmt.Sprintf("|%s: %v|", absolutePathKeyTypeNames[apk.KeyType], apk.Value)
+	return fmt.Sprintf("|%s: %v|", AbsolutePathKeyTypeNames[apk.KeyType], apk.Value)
 }
 
 // Type representing a list of absolute paths
 // Used as an intermediary for calculating JSON paths
 type AbsolutePaths [][]AbsolutePathKey
 
-// Adds the given value to the end of each absolute path in the AbsolutePaths list
-func (p *AbsolutePaths) AddToAll(jsonMap JsonMapInt, pathValues... AbsolutePathKey) (errs []error) {
+// Adds the given value to the end of each absolute path in the AbsolutePaths list.
+// If check is true then the given jsonMap will be checked if all paths can be reached within the context of the map.
+// jsonMap can be nil if check is false.
+func (p *AbsolutePaths) AddToAll(jsonMap JsonMapInt, check bool, pathValues... AbsolutePathKey) (errs []error) {
 	if len(*p) > 0 {
 		// If our AbsolutePaths array contains the following paths...
 		// {property1, 0}
@@ -85,8 +87,8 @@ func (p *AbsolutePaths) AddToAll(jsonMap JsonMapInt, pathValues... AbsolutePathK
 		}
 	}
 
-	// Check if there is a way to all of those paths (only if any new paths were added)
-	if len(pathValues) > 0 {
+	// Check if there is a way to all of those paths (only if any new paths were added and check is true)
+	if len(pathValues) > 0 && check {
 		_, errs = jsonMap.GetAbsolutePaths(p)
 		if errs != nil {
 			return errs
@@ -112,6 +114,7 @@ type JsonMapInt interface {
 	GetInsides() *map[string]interface{}
 	GetAbsolutePaths(absolutePaths *AbsolutePaths) (values []*JsonPathNode, errs []error)
 	JsonPathSelector(jsonPath string) (out []*JsonPathNode, err error)
+	JsonPathSetter(jsonPath string, value interface{}) (err error)
 	Marshal() (out []byte, err error)
 	Run()
 	SetAbsolutePaths(absolutePaths *AbsolutePaths, value interface{}) (err error)

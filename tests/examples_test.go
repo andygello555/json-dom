@@ -41,6 +41,32 @@ var checkStdoutErr = map[string]map[string][]string{
 		"stderr": []string{
 		},
 	},
+	"json_path": {
+		"stdout": []string{
+			"Print call from: <$>:1:1",
+			"map[_absolutePaths:map[0:map[0:map[key:JohnSmith typeId:0 typeName:StringKey] 1:map[key:friends typeId:0 typeName:StringKey] 2:map[key:0 typeId:1 typeName:IndexKey]] 1:map[0:map[key:JohnSmith typeId:0 typeName:StringKey] 1:map[key:friends typeId:0 typeName:StringKey] 2:map[key:2 typeId:1 typeName:IndexKey]] 2:map[0:map[key:JohnSmith typeId:0 typeName:StringKey] 1:map[key:friends typeId:0 typeName:StringKey] 2:map[key:4 typeId:1 typeName:IndexKey]]] getValues:map[] setValues:map[]]",
+			"Print call from: <$>:2:1",
+			"map[_absolutePaths:map[0:map[0:map[key:JaneDoe typeId:0 typeName:StringKey] 1:map[key:friends typeId:0 typeName:StringKey] 2:map[key:map[0:map[key:1 typeId:1 typeName:IndexKey] 1:map[key:3 typeId:1 typeName:IndexKey]] typeId:5 typeName:Slice]]] getValues:map[] setValues:map[]]",
+			"Print call from: <$>:11:5",
+			"map[0:Ava Forster] 1",
+			"map[0:Louis Warren] 1",
+			"Print call from: <$>:20:9",
+			"Ava Forster &map[_absolutePaths:map[0:map[0:map[key:JohnSmith typeId:0 typeName:StringKey] 1:map[key:friends typeId:0 typeName:StringKey] 2:map[key:@ == 'Ava Forster' typeId:3 typeName:Filter]]] getValues:map[] setValues:map[]] &map[age:20 name:Ava Forster]",
+			"Louis Warren &map[_absolutePaths:map[0:map[0:map[key:JaneDoe typeId:0 typeName:StringKey] 1:map[key:friends typeId:0 typeName:StringKey] 2:map[key:@ == 'Louis Warren' typeId:3 typeName:Filter]]] getValues:map[] setValues:map[]] &map[age:20 name:Louis Warren]",
+			"Print call from: <$>:26:5",
+			"map[0:map[age:42 name:Molly Little] 1:map[age:62 name:Daniel Booth] 2:map[age:84 name:Oscar Hodgson] 3:map[name:Libby Ross] 4:map[age:20 name:Ava Forster]] 5",
+			"map[0:map[name:Jayden Welch] 1:map[age:20 name:Louis Warren] 2:map[age:83 name:Libby Willis] 3:map[age:81 name:Mohammad Sutton] 4:map[age:49 name:Katie Cole]] 5",
+			"Print call from: <$>:39:9",
+			"map[age:42 name:Molly Little] &map[_absolutePaths:map[0:map[0:map[key:JohnSmith typeId:0 typeName:StringKey] 1:map[key:friends typeId:0 typeName:StringKey] 2:map[key:@.name == 'Molly Little' typeId:3 typeName:Filter]]] getValues:map[] setValues:map[]] &map[age:42 name:Molly Little",
+			"map[age:62 name:Daniel Booth] &map[_absolutePaths:map[0:map[0:map[key:JohnSmith typeId:0 typeName:StringKey] 1:map[key:friends typeId:0 typeName:StringKey] 2:map[key:@.name == 'Daniel Booth' typeId:3 typeName:Filter]]] getValues:map[] setValues:map[]] &map[age:62 name:Daniel Booth]",
+			"map[age:84 name:Oscar Hodgson] &map[_absolutePaths:map[0:map[0:map[key:JohnSmith typeId:0 typeName:StringKey] 1:map[key:friends typeId:0 typeName:StringKey] 2:map[key:@.name == 'Oscar Hodgson' typeId:3 typeName:Filter]]] getValues:map[] setValues:map[]] &map[age:84 name:Oscar Hodgson]",
+			"map[age:20 name:Libby Ross] &map[_absolutePaths:map[0:map[0:map[key:JohnSmith typeId:0 typeName:StringKey] 1:map[key:friends typeId:0 typeName:StringKey] 2:map[key:@.name == 'Libby Ross' typeId:3 typeName:Filter]]] getValues:map[] setValues:map[]] &map[age:20 name:Libby Ross]",
+			"map[age:20 name:Ava Forster] &map[_absolutePaths:map[0:map[0:map[key:JohnSmith typeId:0 typeName:StringKey] 1:map[key:friends typeId:0 typeName:StringKey] 2:map[key:@.name == 'Ava Forster' typeId:3 typeName:Filter]]] getValues:map[] setValues:map[]] &map[age:20 name:Ava Forster]",
+
+		},
+		"stderr": []string{
+		},
+	},
 }
 
 type exampleTableEntry struct {
@@ -152,6 +178,8 @@ func TestExamples(t *testing.T) {
 				} else {
 					insides = *jsonMap.GetInsides()
 				}
+				//b, _ := json.MarshalIndent(insides, "", "  ")
+				//fmt.Println(string(b))
 
 				// Finally, compare the insides of the JsonMap with the Unmarshalled expected output from the example_out dir
 				utils.JsonMapEqualTest(t, insides, example.out, fmt.Sprintf("\"%s\"", example.name))

@@ -19,14 +19,14 @@ type state struct {
 	// Given the JsonMap, the current absolute paths, the remaining path expression and the token, will validate whether
 	// the new path exists in the JsonMap.
 	// If error is nil then the path is valid, otherwise the path is not valid
-	validator  func(token []byte, togo []byte, jsonMap json_map.JsonMapInt) (absolutePathKeys []json_map.AbsolutePathKey, errs []error)
+	validator  func(token []byte, togo []byte) (absolutePathKeys []json_map.AbsolutePathKey, errs []error)
 }
 
 var (
 	property = state{
 		name:       "Property (property)",
 		tokenRegex: regexp.MustCompile("([a-zA-Z_]+([a-zA-Z0-9_-]*)|\\*)"),
-		validator:  func(token []byte, togo []byte, jsonMap json_map.JsonMapInt) (absolutePathKeys []json_map.AbsolutePathKey, errs []error) {
+		validator:  func(token []byte, togo []byte) (absolutePathKeys []json_map.AbsolutePathKey, errs []error) {
 			absolutePathKeys = make([]json_map.AbsolutePathKey, 0)
 			switch {
 			case regexp.MustCompile("\\*").Match(token):
@@ -50,7 +50,7 @@ var (
 		// We allow anything to be written as a filter expression as it will be passed to otto which will parse the
 		// expression and throw up an error if it's incorrect
 		tokenRegex: regexp.MustCompile("\\[\\?\\(.*\\)]"),
-		validator: func(token []byte, togo []byte, jsonMap json_map.JsonMapInt) (absolutePathKeys []json_map.AbsolutePathKey, errs []error) {
+		validator: func(token []byte, togo []byte) (absolutePathKeys []json_map.AbsolutePathKey, errs []error) {
 			// We just add the expression body to the absolute path keys
 			absolutePathKeys = []json_map.AbsolutePathKey{{
 				KeyType: json_map.Filter,
@@ -64,7 +64,7 @@ var (
 		tokenRegex: regexp.MustCompile("\\[(-?\\d+:?|:?-?\\d+|\\d+:\\d+|\\*|\\d+(,\\s*\\d+)*)]"),
 		// The validator for index needs to check if its slice notation [start:end], [start:], [:end], [-start:], [:-end]
 		// or if just a normal array index: [n]
-		validator:  func(token []byte, togo []byte, jsonMap json_map.JsonMapInt) (absolutePathKeys []json_map.AbsolutePathKey, errs []error) {
+		validator:  func(token []byte, togo []byte) (absolutePathKeys []json_map.AbsolutePathKey, errs []error) {
 			// Function to remove square braces and whitespace then split at the given separator
 			stripSplitIndex := func(token []byte, separator string) []string {
 				return strings.Split(StripWhitespace(string(regexp.MustCompile("[\\[\\]]").ReplaceAll(token, []byte("")))), separator)
@@ -145,7 +145,7 @@ var (
 		tokenRegex:     regexp.MustCompile("\\."),
 		// The validator for a dot needs to check if it is a recursive descent (the next token is a dot) if it is then
 		// append zero to all absolute paths and test whether the
-		validator: func(token []byte, togo []byte, jsonMap json_map.JsonMapInt) (absolutePathKeys []json_map.AbsolutePathKey, errs []error) {
+		validator: func(token []byte, togo []byte) (absolutePathKeys []json_map.AbsolutePathKey, errs []error) {
 			absolutePathKeys = make([]json_map.AbsolutePathKey, 0)
 			// Check if recursive descent, aka. the next token is a dot
 			if togo[1] == '.' {
@@ -188,7 +188,7 @@ var fromStateToStates = map[string][]*state {
 }
 
 // Will decide the next state given a list of possible states and call the validator for that next state
-func (s *state) handler(togo []byte, jsonMap json_map.JsonMapInt, absolutePaths *json_map.AbsolutePaths) (next *state, err error) {
+func (s *state) handler(togo []byte, absolutePaths *json_map.AbsolutePaths) (next *state, err error) {
 	//fmt.Println("togo:", string(togo), "togo len:", len(togo))
 	next = nil
 	var token []byte
@@ -216,14 +216,14 @@ func (s *state) handler(togo []byte, jsonMap json_map.JsonMapInt, absolutePaths 
 		//fmt.Println("next state:", next)
 
 		// Run the validator for the next state
-		nextPaths, errs := next.validator(token, togo, jsonMap)
+		nextPaths, errs := next.validator(token, togo)
 		if errs != nil {
 			return nil, JsonPathError.FillFromErrors(errs)
 		}
 		//fmt.Println("nextPaths:", nextPaths)
 
 		// Add the nextPath variable to the end of all absolute paths
-		errs = absolutePaths.AddToAll(jsonMap, nextPaths...)
+		errs = absolutePaths.AddToAll(nil, false, nextPaths...)
 		if errs != nil {
 			return nil, JsonPathError.FillFromErrors(errs)
 		}
@@ -243,7 +243,7 @@ func (s *state) handler(togo []byte, jsonMap json_map.JsonMapInt, absolutePaths 
 //		{0, "property", 1, "name"},
 //		{0, "property", 2, "name"},
 // }
-func ParseJsonPath(jsonPath string, jsonMap json_map.JsonMapInt) (absolutePaths json_map.AbsolutePaths, err error) {
+func ParseJsonPath(jsonPath string) (absolutePaths json_map.AbsolutePaths, err error) {
 	// The collection of absolute paths to the values represented by the JSON path
 	absolutePaths = make(json_map.AbsolutePaths, 0)
 	previousState := &start
@@ -281,7 +281,7 @@ func ParseJsonPath(jsonPath string, jsonMap json_map.JsonMapInt) (absolutePaths 
 		// Call the handler function for the current state which will return the next state
 		// Also set the current state to be the previous state
 		previousState = currentState
-		currentState, err = currentState.handler(next, jsonMap, &absolutePaths)
+		currentState, err = currentState.handler(next, &absolutePaths)
 		if err != nil {
 			return nil, err
 		}
