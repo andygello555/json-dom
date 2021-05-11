@@ -7,26 +7,28 @@ type AbsolutePathKeyType int
 
 // All the key types that can be added to an absolute path
 const (
-	StringKey AbsolutePathKeyType = iota
-	IndexKey  AbsolutePathKeyType = iota
-	Wildcard  AbsolutePathKeyType = iota
-	Filter    AbsolutePathKeyType = iota
-	First     AbsolutePathKeyType = iota
-	Slice     AbsolutePathKeyType = iota
+	StringKey       AbsolutePathKeyType = iota
+	IndexKey        AbsolutePathKeyType = iota
+	Wildcard        AbsolutePathKeyType = iota
+	Filter          AbsolutePathKeyType = iota
+	First           AbsolutePathKeyType = iota
+	Slice           AbsolutePathKeyType = iota
 	// NOTE the following should only be used within a Slice AbsolutePathKey's Value
-	StartEnd  AbsolutePathKeyType = iota
+	StartEnd        AbsolutePathKeyType = iota
+	RecursiveLookup AbsolutePathKeyType = iota
 )
 
 // Map of absolute key type values to their corresponding names
 // Used in String method of AbsolutePathKey
 var AbsolutePathKeyTypeNames = map[AbsolutePathKeyType]string {
-	StringKey: "StringKey",
-	IndexKey:  "IndexKey",
-	Wildcard:  "Wildcard",
-	Filter:    "Filter",
-	First:     "First",
-	Slice:     "Slice",
-	StartEnd:  "StartEnd",
+	StringKey:       "StringKey",
+	IndexKey:        "IndexKey",
+	Wildcard:        "Wildcard",
+	Filter:          "Filter",
+	First:           "First",
+	Slice:           "Slice",
+	StartEnd:        "StartEnd",
+	RecursiveLookup: "RecursiveLookup",
 }
 
 // An absolute path key with a KeyType and a Value

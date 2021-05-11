@@ -147,13 +147,27 @@ var (
 		// append zero to all absolute paths and test whether the
 		validator: func(token []byte, togo []byte) (absolutePathKeys []json_map.AbsolutePathKey, errs []error) {
 			absolutePathKeys = make([]json_map.AbsolutePathKey, 0)
-			// Check if recursive descent, aka. the next token is a dot
+			// Check if first descent, aka. the next token is a dot
 			if togo[1] == '.' {
 				// Add the First Key type to all paths
 				absolutePathKeys = append(absolutePathKeys, json_map.AbsolutePathKey{
 					KeyType: json_map.First,
 					Value:   nil,
 				})
+			}
+			return absolutePathKeys, nil
+		},
+	}
+	recursiveLookup = state{
+		name:       "Recursive lookup (.property)",
+		// Similar to property state but with a '.' at the front
+		tokenRegex: regexp.MustCompile("\\.\\.[a-zA-Z_]+([a-zA-Z0-9_-]*)"),
+		validator:  func(token []byte, togo []byte) (absolutePathKeys []json_map.AbsolutePathKey, errs []error) {
+			absolutePathKeys = make([]json_map.AbsolutePathKey, 1)
+			// Create an absolute path key from the token[2:]
+			absolutePathKeys[0] = json_map.AbsolutePathKey{
+				KeyType: json_map.RecursiveLookup,
+				Value:   string(token[2:]),
 			}
 			return absolutePathKeys, nil
 		},
@@ -178,13 +192,15 @@ var (
 )
 
 // A table of each state name to all the states that can precede the state of that name
+// NOTE recursiveLookup will always takes precedence over dot. This is to ensure that recursive lookups are consumed first
 var fromStateToStates = map[string][]*state {
 	"Start": {},
-	"Root node ($)": {&dot, &index, &filter},
-	"Dot (.)": {&dot, &index, &filter, &property},
-	"Array Index ([n])": {&index, &dot, &filter},
-	"Property (property)": {&dot, &index, &filter},
-	"Filter Expression ([?(...)])": {&dot, &index, &filter},
+	"Root node ($)": {&recursiveLookup, &dot, &index, &filter},
+	"Recursive lookup (.property)": {&recursiveLookup, &dot, &index, &filter},
+	"Dot (.)": {&recursiveLookup, &dot, &index, &filter, &property},
+	"Array Index ([n])": {&recursiveLookup, &index, &dot, &filter},
+	"Property (property)": {&recursiveLookup, &dot, &index, &filter},
+	"Filter Expression ([?(...)])": {&recursiveLookup, &dot, &index, &filter},
 }
 
 // Will decide the next state given a list of possible states and call the validator for that next state
@@ -286,6 +302,6 @@ func ParseJsonPath(jsonPath string) (absolutePaths json_map.AbsolutePaths, err e
 			return nil, err
 		}
 	}
-	//fmt.Println(absolutePaths)
+	//fmt.Println("absolutePaths:", absolutePaths)
 	return absolutePaths, nil
 }

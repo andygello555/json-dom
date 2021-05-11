@@ -26,6 +26,10 @@
     "JaneDoe": {
         "friends": [
             {
+                "name": "Jayden Welch",
+                "age": 20
+            },
+            {
                 "name": "Louis Warren",
                 "age": 20
             },

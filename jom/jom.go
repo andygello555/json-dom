@@ -339,6 +339,88 @@ func pathFinder(path []json_map.AbsolutePathKey, jsonMap map[string]interface{},
 	var currValue interface{} = jsonMap
 	var err error = nil
 
+	// Temp helper function for recursive lookups
+	recursiveLookup := func(key json_map.AbsolutePathKey, arrOrMap interface{}) []interface{} {
+		// We'll have to spin up additional finders for every key within this map
+		// Create a wait group which all Sub-Finders will be added to
+		var subWg sync.WaitGroup
+		// Create an in and out channel using the InOut data structure
+		inFound, outFound := utils.InOut()
+		toFind := key.Value.(string)
+		foundValues := make([]interface{}, 0)
+
+		// Set up a temp function for the RecursiveLookup finders
+		var subFinder func(subtree interface{}, subWg *sync.WaitGroup, toFind string, foundlings chan<- interface{})
+		subFinder = func(subtree interface{}, subWg *sync.WaitGroup, toFind string, foundlings chan<- interface{}) {
+			// Only defer done when a wait group is given
+			if subWg != nil {
+				defer subWg.Done()
+			}
+
+			switch subtree.(type) {
+			case map[string]interface{}:
+				subM := subtree.(map[string]interface{})
+				// Check if the toFind property is within the map
+				if toAdd, ok := subM[toFind]; ok {
+					// Then we can add the value of the toFind key to the values channel
+					foundlings <- toAdd
+				} else {
+					// Recurse into all the other keys within the map
+					for _, subSubtree := range subM {
+						subFinder(subSubtree, nil, toFind, foundlings)
+					}
+				}
+				break
+			case []interface{}:
+				// Since an array doesn't have any keys to search for we will just recurse down
+				for _, subSubtree := range subtree.([]interface{}) {
+					subFinder(subSubtree, nil, toFind, foundlings)
+				}
+				break
+			default:
+				// Base case so we'll break and return
+				break
+			}
+			return
+		}
+
+		// Start the sub-finders for each sub-tree of depth one
+		// We do a type switch here to work out whether we are iterating over a map or on array
+		switch arrOrMap.(type) {
+		case map[string]interface{}:
+			m := arrOrMap.(map[string]interface{})
+			subWg.Add(len(m))
+			for _, value := range m {
+				go subFinder(value, &subWg, toFind, inFound)
+			}
+		case []interface{}:
+			arr := arrOrMap.([]interface{})
+			subWg.Add(len(arr))
+			for _, value := range arr {
+				go subFinder(value, &subWg, toFind, inFound)
+			}
+		}
+
+		// Wait for all Finders and then close the input channel
+		subWg.Wait()
+		close(inFound)
+
+		// Finally we read all the values from the out channel and append them to the foundValues array
+		for v := range outFound {
+			// If the value added was an array then we will "unwrap" it
+			switch v.(type) {
+			case []interface{}:
+				for _, av := range v.([]interface{}) {
+					foundValues = append(foundValues, av)
+				}
+			default:
+				foundValues = append(foundValues, v)
+			}
+		}
+		return foundValues
+	}
+
+
 	// Iterate through the absolute path keys
 	for _, key := range path {
 		// StartEnd KeyTypes must be within a Slice key type so throw an error if so
@@ -408,6 +490,10 @@ func pathFinder(path []json_map.AbsolutePathKey, jsonMap map[string]interface{},
 				// Otherwise sort the strings and take the value of the first key as the new current value
 				sort.Strings(keys)
 				currValue = m[keys[0]]
+			case json_map.RecursiveLookup:
+				// We set the current value to be all found values
+				currValue = recursiveLookup(key, m)
+				break
 			default:
 				err = utils.JsonPathError.FillError(fmt.Sprintf("AbsolutePathKey of type: %v is unrecognised", key.KeyType))
 				break
@@ -503,6 +589,10 @@ func pathFinder(path []json_map.AbsolutePathKey, jsonMap map[string]interface{},
 				if err != nil {
 					break
 				}
+			case json_map.RecursiveLookup:
+				// We set the current value to be all found values from the recursive lookup helper
+				currValue = recursiveLookup(key, arr)
+				break
 			default:
 				err = utils.JsonPathError.FillError(fmt.Sprintf("AbsolutePathKey of type: %v is unrecognised", key.KeyType))
 				break
@@ -692,6 +782,8 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 					// Otherwise sort the strings and take the value of the first key as the new current value
 					sort.Strings(keys)
 					setterMap(&m, keys[0])
+				case json_map.RecursiveLookup:
+					break
 				default:
 					panic(recursionError{fmt.Sprintf("AbsolutePathKey of type: %v is unrecognised", key.KeyType)})
 				}
@@ -773,6 +865,8 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 
 					// Then we iterate through a range of slice indices
 					setterArr(&arr, utils.Range(sliceIndices[0], sliceIndices[1] - 1, 1)...)
+				case json_map.RecursiveLookup:
+					break
 				default:
 					panic(recursionError{fmt.Sprintf("AbsolutePathKey of type: %v is unrecognised", key.KeyType)})
 				}

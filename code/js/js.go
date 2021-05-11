@@ -175,6 +175,7 @@ func jsonPathSelector(call otto.FunctionCall) otto.Value {
 		return jMap
 	}
 
+	// Another temp function to get the absolute path values from the given JsonMap
 	getAbsPaths := func(absolutePaths *json_map.AbsolutePaths, jMap *jom.JsonMap) []*json_map.JsonPathNode {
 		values, errs := jMap.GetAbsolutePaths(absolutePaths)
 		if errs != nil {
