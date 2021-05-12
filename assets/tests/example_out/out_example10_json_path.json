@@ -2,10 +2,6 @@
     "JohnSmith": {
         "friends": [
             {
-                "name": "Molly Little",
-                "age": 42
-            },
-            {
                 "name": "Daniel Booth",
                 "age": 62
             },
@@ -25,10 +21,6 @@
     },
     "JaneDoe": {
         "friends": [
-            {
-                "name": "Jayden Welch",
-                "age": 20
-            },
             {
                 "name": "Louis Warren",
                 "age": 20

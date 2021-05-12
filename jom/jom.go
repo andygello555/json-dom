@@ -370,13 +370,11 @@ func pathFinder(path []json_map.AbsolutePathKey, jsonMap map[string]interface{},
 						subFinder(subSubtree, nil, toFind, foundlings)
 					}
 				}
-				break
 			case []interface{}:
 				// Since an array doesn't have any keys to search for we will just recurse down
 				for _, subSubtree := range subtree.([]interface{}) {
 					subFinder(subSubtree, nil, toFind, foundlings)
 				}
-				break
 			default:
 				// Base case so we'll break and return
 				break
@@ -677,12 +675,14 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 		if len(remainingPath) > 0 {
 			// Pop the next path key
 			var key json_map.AbsolutePathKey
+			//fmt.Print("value:", value, ", remaining:", remainingPath)
 			key, remainingPath = remainingPath[0], remainingPath[1:]
+			//fmt.Print(", up next:", key)
 
 			// Some precomputed flags for readability
 			lastKey := len(remainingPath) == 0   // Whether we are on the last key in the path and should set the value
 			deleteVal := value == nil && lastKey // Whether we are on the last key AND value is nil so we should delete
-			//fmt.Println("on tree:", currTree, "key:", key, "remaining path:", remainingPath)
+			//fmt.Println(" lastKey, deleteVal =", lastKey, deleteVal)
 
 			// A simple setter function which returns the value needed for the given index depending on whether we are
 			// on the last key or not
@@ -693,6 +693,9 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 						newValue = recursiveTraversal(remainingPath, obj.(map[string]interface{})[index.(string)])
 					case []interface{}:
 						newValue = recursiveTraversal(remainingPath, obj.([]interface{})[index.(int)])
+					default:
+						// Otherwise we cannot continue down the tree any further
+						panic(recursionError{fmt.Sprintf("Cannot recurse down subtree of type \"%s\"", reflect.TypeOf(obj).Name())})
 					}
 					return newValue
 				}
@@ -725,6 +728,73 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 						(*arrRef)[idx] = setter(*arrRef, idx)
 					}
 				}
+			}
+
+			// Temp helper function for recursive lookups
+			recursiveLookup := func(key json_map.AbsolutePathKey, arrOrMap interface{}) (newTree interface{}) {
+				// Extract the key to find from the AbsolutePathKey
+				toFind := key.Value.(string)
+
+				// Set up a temp function for the RecursiveLookup finders
+				var subFinder func(subtree interface{}, toFind string) (newSubtree interface{})
+				subFinder = func(subtree interface{}, toFind string) (newSubtree interface{}) {
+					switch subtree.(type) {
+					case map[string]interface{}:
+						subM := subtree.(map[string]interface{})
+						// Create a copy of the map to store the updated subtree in
+						newSubtreeM := utils.CopyMap(subM)
+
+						// Check if the toFind property is within the map
+						if _, ok := subM[toFind]; ok {
+							// Then we can use the setterMap function to set, delete from or recurse down the map
+							setterMap(&newSubtreeM, toFind)
+							//fmt.Println("found \"", toFind, "\" in", subM, "setting to", newSubtreeM)
+						} else {
+							// Recurse into all the other keys within the map and set the new subtrees returned in the
+							// clone of the current subtree (newSubtreeM)
+							for subSubKey, subSubtree := range subM {
+								newSubtreeM[subSubKey] = subFinder(subSubtree, toFind)
+							}
+						}
+						// Set the new subtree return value
+						newSubtree = newSubtreeM
+					case []interface{}:
+						subArr := subtree.([]interface{})
+						// Allocate memory for a new array of the same size
+						newSubtreeArr := make([]interface{}, len(subArr))
+						// Since an array doesn't have any keys to search for we will just recurse down
+						for subSubIdx, subSubtree := range subArr {
+							newSubtreeArr[subSubIdx] = subFinder(subSubtree, toFind)
+							//fmt.Println("recursing down", subArr[subSubIdx], "in", subArr, "setting to", newSubtreeArr[subSubIdx])
+						}
+						// Set the new subtree return value
+						newSubtree = newSubtreeArr
+					default:
+						// Base case so we just return the subtree without recursing down it
+						newSubtree = subtree
+					}
+					return newSubtree
+				}
+
+				// RECURSE DOWN EACH SUBTREE IN THE MAP/ARRAY
+				// We do a type switch here to work out whether we are iterating over a map or on array
+				switch arrOrMap.(type) {
+				case map[string]interface{}:
+					m := arrOrMap.(map[string]interface{})
+					mCopy := utils.CopyMap(m)
+					for k, v := range m {
+						mCopy[k] = subFinder(v, toFind)
+					}
+					newTree = mCopy
+				case []interface{}:
+					arr := arrOrMap.([]interface{})
+					arrCopy := make([]interface{}, len(arr))
+					for i, v := range arr {
+						arrCopy[i] = subFinder(v, toFind)
+					}
+					newTree = arrCopy
+				}
+				return newTree
 			}
 
 			// StartEnd KeyTypes must be within a Slice key type so throw an error if so
@@ -783,7 +853,11 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 					sort.Strings(keys)
 					setterMap(&m, keys[0])
 				case json_map.RecursiveLookup:
-					break
+					// NOTE: The RecursiveLookup case is a special scenario where the traversal is continued within the
+					// recursive lookup function. This means after the function returns we can empty the path queue so
+					// we stop in the recursiveLookup function
+					m = recursiveLookup(key, m).(map[string]interface{})
+					remainingPath = []json_map.AbsolutePathKey{}
 				default:
 					panic(recursionError{fmt.Sprintf("AbsolutePathKey of type: %v is unrecognised", key.KeyType)})
 				}
@@ -866,14 +940,18 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 					// Then we iterate through a range of slice indices
 					setterArr(&arr, utils.Range(sliceIndices[0], sliceIndices[1] - 1, 1)...)
 				case json_map.RecursiveLookup:
-					break
+					// NOTE: The RecursiveLookup case is a special scenario where the traversal is continued within the
+					// recursive lookup function. This means after the function returns we can empty the path queue so
+					// we stop in the recursiveLookup function
+					arr = recursiveLookup(key, arr).([]interface{})
+					remainingPath = []json_map.AbsolutePathKey{}
 				default:
 					panic(recursionError{fmt.Sprintf("AbsolutePathKey of type: %v is unrecognised", key.KeyType)})
 				}
 				// Current tree set to the modified array
 				currTree = arr
 			default:
-				panic(recursionError{fmt.Sprintf("Cannot access key %v of type %s", key, reflect.TypeOf(currTree).Name())})
+				panic(recursionError{fmt.Sprintf("Cannot access key %v within type %s", key, reflect.TypeOf(currTree).Name())})
 			}
 		}
 		return currTree
@@ -883,6 +961,7 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 	err = nil
 	for _, path := range *absolutePaths {
 		func() {
+			// PANIC HANDLING
 			defer func() {
 				// Handle any errors that occur within the recursive traversal
 				if caught := recover(); caught != nil {
@@ -905,6 +984,7 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 			case map[string]interface{}:
 				jsonMap.insides = newInsides.(map[string]interface{})
 			case []interface{}:
+				// FIXME: The root array hack
 				jsonMap.insides["array"] = newInsides.([]interface{})
 				jsonMap.Array = true
 			default:
