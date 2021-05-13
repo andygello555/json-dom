@@ -258,7 +258,7 @@ Scripts are run using the [otto](https://pkg.go.dev/github.com/robertkrimen/otto
 
 ## JSON path notes
 
-The JSON path implementation is fairly similar to the one outlined [here](https://support.smartbear.com/alertsite/docs/monitors/api/endpoint/jsonpath.html). The only real differences is with Recursive Descent expressions (e.g. `$..friends`). In this implementation `..` acts as a "first" descent where it will descend down the alphabetically first key which has a value that is either an object or an array.<br/>
+The JSON path implementation is fairly similar to the one outlined [here](https://support.smartbear.com/alertsite/docs/monitors/api/endpoint/jsonpath.html). The only real differences is that there is new syntax for what's called First Descent (e.g. `$...friends`). This causes descent down the alphabetically first key which has a value that is either an object or an array. Appending more dots to the end of an ellipses `...` will descend once more for each extra dot.<br/>
 
 The main functions/symbols relating to JSON path functionality:
 - `json.jsonPathSelector(String jsonPath) -> NodeSet`: The main function to call to construct your `NodeSet` object

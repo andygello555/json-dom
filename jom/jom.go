@@ -360,15 +360,15 @@ func pathFinder(path []json_map.AbsolutePathKey, jsonMap map[string]interface{},
 			switch subtree.(type) {
 			case map[string]interface{}:
 				subM := subtree.(map[string]interface{})
-				// Check if the toFind property is within the map
-				if toAdd, ok := subM[toFind]; ok {
-					// Then we can add the value of the toFind key to the values channel
-					foundlings <- toAdd
-				} else {
-					// Recurse into all the other keys within the map
-					for _, subSubtree := range subM {
-						subFinder(subSubtree, nil, toFind, foundlings)
+				for subSubKey, subSubtree := range subM {
+					// Recurse into all the keys within the map checking if the key of the current subtree is equal to
+					// the key we are meant to be finding
+					if subSubKey == toFind {
+						// If so we add the subtree to the values channel
+						foundlings <- subSubtree
 					}
+					// ... we still traverse in order to explore everything
+					subFinder(subSubtree, nil, toFind, foundlings)
 				}
 			case []interface{}:
 				// Since an array doesn't have any keys to search for we will just recurse down
@@ -651,10 +651,29 @@ func (jsonMap *JsonMap) GetAbsolutePaths(absolutePaths *json_map.AbsolutePaths) 
 	values = make([]*json_map.JsonPathNode, 0)
 	for value := range valuesChan {
 		//fmt.Println("Appending", value)
-		values = append(values, &json_map.JsonPathNode{
-			Absolute: value.Absolute,
-			Value:    value.Value,
-		})
+		switch value.Value.(type) {
+		case []interface{}:
+			// We unwrap any arrays returned from the finders
+			for i, v := range value.Value.([]interface{}) {
+				// We have to amend the absolute paths for the nodes by adding on an IndexKey at each iteration
+				amendedAbsolute := make([]json_map.AbsolutePathKey, len(value.Absolute) + 1)
+				copy(amendedAbsolute, value.Absolute)
+				amendedAbsolute = append(amendedAbsolute, json_map.AbsolutePathKey{
+					KeyType: json_map.IndexKey,
+					Value:   i,
+				})
+				values = append(values, &json_map.JsonPathNode{
+					Absolute: amendedAbsolute,
+					Value:    v,
+				})
+			}
+		default:
+			// Otherwise we just append normally
+			values = append(values, &json_map.JsonPathNode{
+				Absolute: value.Absolute,
+				Value:    value.Value,
+			})
+		}
 	}
 	return values, nil
 }
@@ -745,14 +764,38 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 						newSubtreeM := utils.CopyMap(subM)
 
 						// Check if the toFind property is within the map
-						if _, ok := subM[toFind]; ok {
-							// Then we can use the setterMap function to set, delete from or recurse down the map
-							setterMap(&newSubtreeM, toFind)
-							//fmt.Println("found \"", toFind, "\" in", subM, "setting to", newSubtreeM)
-						} else {
-							// Recurse into all the other keys within the map and set the new subtrees returned in the
-							// clone of the current subtree (newSubtreeM)
-							for subSubKey, subSubtree := range subM {
+						//if _, ok := subM[toFind]; ok {
+						//	// Then we can use the setterMap function to set, delete from or recurse down the map
+						//	// This is so that if we still have path remaining we will continue the search at this subtree
+						//	setterMap(&newSubtreeM, toFind)
+						//	//fmt.Println("found \"", toFind, "\" in", subM, "setting to", newSubtreeM)
+						//} else {
+						//	// Recurse into all the other keys within the map and set the new subtrees returned in the
+						//	// clone of the current subtree (newSubtreeM)
+						//	for subSubKey, subSubtree := range subM {
+						//		// If the current key is equal to the toFind key we continue the recursiveTraversal
+						//		// subroutine from here
+						//		if subSubKey == toFind {
+						//			// Then we can use the setterMap function to set, delete from or recurse down the map
+						//			// This is so that if we still have path remaining we will continue the search at this subtree
+						//			setterMap(&newSubtreeM, toFind)
+						//		} else {
+						//			// Otherwise we continue our search for the toFind key
+						//			newSubtreeM[subSubKey] = subFinder(subSubtree, toFind)
+						//		}
+						//	}
+						//}
+						// Recurse into all the other keys within the map and set the new subtrees returned in the
+						// clone of the current subtree (newSubtreeM)
+						for subSubKey, subSubtree := range subM {
+							// If the current key is equal to the toFind key we continue the recursiveTraversal
+							// subroutine from here
+							if subSubKey == toFind {
+								// Then we can use the setterMap function to set, delete from or recurse down the map
+								// This is so that if we still have path remaining we will continue the search at this subtree
+								setterMap(&newSubtreeM, toFind)
+							} else {
+								// Otherwise we continue our search for the toFind key
 								newSubtreeM[subSubKey] = subFinder(subSubtree, toFind)
 							}
 						}
@@ -1007,7 +1050,8 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 // This function supports the following JSON path syntax
 // - Property selection: .property BUT NOT ['property']
 // - Element selection: [n], [x, y, z]
-// - First descent: ..property (different to JSON path spec ".." descends down the alphabetically first map/array)
+// - First descent: ...property (different to JSON path spec "...*" descends down the alphabetically first map/array)
+// - Recursive lookup: ..property (precedence over First descent - searches for all the properties of the given name)
 // - Wildcards: .property.*, [*]
 // - List slicing: [start:end], [start:], [-start:], [:end], [:-end]
 // - Filter expressions: [?(expression)]

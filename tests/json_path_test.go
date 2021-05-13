@@ -88,7 +88,11 @@ var exampleJsonPathInput = []string{
 	"$.person.friends[0]",
 	"$.person.friends[0, 2, 4]",
 	// First descent
+	"$...friends[1].name",
+	// Recursive descent
 	"$..friends[1].name",
+	"$..friends..age[*]",
+	"$..age[*]",
 	// Wildcard
 	"$.person.friends[*]",
 	"$.person.friends[0].*[0, 1]",
@@ -278,25 +282,59 @@ func init() {
 			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[2],
 			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[4],
 		},
+		// $...friends[1].name
+		{exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[1].(map[string]interface{})["name"]},
 		// $..friends[1].name
 		{exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[1].(map[string]interface{})["name"]},
+		// $..friends..age[0]
+		{24, 55, 36, 40, 21},
+		// $..age[0]
+		{24, 55, 36, 40, 21, 18},
 		// $.person.friends[*]
-		{exampleMap["person"].(map[string]interface{})["friends"].([]interface{})},
+		{
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[0],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[1],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[2],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[3],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[4],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[5],
+		},
 		// $.person.friends[0].*[0, 1]
 		{
 			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[0].(map[string]interface{})["name"],
 			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[0].(map[string]interface{})["age"],
 		},
 		// $..friends[1:5]
-		{exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[1:5]},
+		{
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[1],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[2],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[3],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[4],
+		},
 		// $..friends[1:]
-		{exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[1:]},
+		{
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[1],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[2],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[3],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[4],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[5],
+		},
 		// $..friends[:2]
-		{exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[:2]},
+		{
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[0],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[1],
+		},
 		// $..friends[-2:]
-		{exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[4:]},
+		{
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[4],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[5],
+		},
 		// $..friends[:-3]
-		{exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[:3]},
+		{
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[0],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[1],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[2],
+		},
 		// $..friends[?(@.age==21)]
 		{exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[4]},
 		// $..friends[?(@.name!='Gary Twain')]
@@ -344,7 +382,7 @@ func init() {
 		// $[?(@.friends && @.name && @.age)]
 		{exampleMap["person"].(map[string]interface{})},
 		// $[?(@.eggs)]
-		{[]interface{}{}},
+		{},
 		// $[?(typeof @ == 'number' && @ == 40)]
 		{40},
 		// $..friends[0][?(typeof @ == 'string')]
@@ -376,7 +414,12 @@ func init() {
 		// {"person", *},
 		{
 			exampleMap["person"],
-			exampleMap["person"].(map[string]interface{})["friends"],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[0],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[1],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[2],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[3],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[4],
+			exampleMap["person"].(map[string]interface{})["friends"].([]interface{})[5],
 		},
 		{},
 	}

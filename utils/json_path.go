@@ -142,13 +142,14 @@ var (
 	}
 	dot = state{
 		name:           "Dot (.)",
-		tokenRegex:     regexp.MustCompile("\\."),
+		tokenRegex:     regexp.MustCompile("\\.+"),
 		// The validator for a dot needs to check if it is a recursive descent (the next token is a dot) if it is then
 		// append zero to all absolute paths and test whether the
 		validator: func(token []byte, togo []byte) (absolutePathKeys []json_map.AbsolutePathKey, errs []error) {
 			absolutePathKeys = make([]json_map.AbsolutePathKey, 0)
-			// Check if first descent, aka. the next token is a dot
-			if togo[1] == '.' {
+			// We keep appending AbsolutePathKeys of type First up until len(token) - 2. This is so that we consume
+			// "." and ".." then for every dot after ".." we insert a First AbsolutePathKey
+			for i := 0; i < len(token) - 2; i++ {
 				// Add the First Key type to all paths
 				absolutePathKeys = append(absolutePathKeys, json_map.AbsolutePathKey{
 					KeyType: json_map.First,
@@ -236,7 +237,7 @@ func (s *state) handler(togo []byte, absolutePaths *json_map.AbsolutePaths) (nex
 		if errs != nil {
 			return nil, JsonPathError.FillFromErrors(errs)
 		}
-		//fmt.Println("nextPaths:", nextPaths)
+		//fmt.Println("nextPaths:", nextPaths, "token:", string(token), "togo:", string(togo))
 
 		// Add the nextPath variable to the end of all absolute paths
 		errs = absolutePaths.AddToAll(nil, false, nextPaths...)
