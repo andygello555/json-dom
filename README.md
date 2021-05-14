@@ -269,3 +269,7 @@ The main functions/symbols relating to JSON path functionality:
     - `key`: The value of the current absolute path key
   - `getValues() -> Array[Node]`: Returns the values at the nodes pointed to by the JSON path which was used when constructing the `NodeSet`
   - `setValues(value Any)`: Sets the values at the nodes pointed to by the JSON path which was used when constructing the `NodeSet` to the given value. If the value given is `null` then the values pointed to will be deleted.
+
+## More examples...
+
+Check out [`assets/tests/examples`](assets/tests/examples) for some more examples and [`assets/tests/example_out`](assets/tests/example_out) for their corresponding evaluated JSON.
