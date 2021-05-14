@@ -145,6 +145,7 @@ var exampleSetAbsolutePathInput = []setAbsolutePathExample{
 		// hjson unmarshalls numerical values to float64 so we will cast every numerical value to that
 		float64(20),
 	},
+	// Set index 0, 2 and 4 to be Dumbledore object
 	{
 		json_map.AbsolutePaths{
 			{
@@ -168,6 +169,7 @@ var exampleSetAbsolutePathInput = []setAbsolutePathExample{
 			"age":  "IDK",
 		},
 	},
+	// Set every friend's name with a name longer than 14 characters to "Long Name"
 	{
 		json_map.AbsolutePaths{
 			{
@@ -179,6 +181,7 @@ var exampleSetAbsolutePathInput = []setAbsolutePathExample{
 		},
 		"Long Name",
 	},
+	// Delete all key-value pairs within the first element of the friends list
 	{
 		json_map.AbsolutePaths{
 			{
@@ -190,6 +193,7 @@ var exampleSetAbsolutePathInput = []setAbsolutePathExample{
 		},
 		nil,
 	},
+	// Delete the first element of the friends list
 	{
 		json_map.AbsolutePaths{
 			{
@@ -200,6 +204,7 @@ var exampleSetAbsolutePathInput = []setAbsolutePathExample{
 		},
 		nil,
 	},
+	// Delete the age key-value pair of each element within the friends list
 	{
 		json_map.AbsolutePaths{
 			{
@@ -210,6 +215,7 @@ var exampleSetAbsolutePathInput = []setAbsolutePathExample{
 		},
 		nil,
 	},
+	// Delete all elements from the friends list
 	{
 		json_map.AbsolutePaths{
 			{
@@ -220,6 +226,7 @@ var exampleSetAbsolutePathInput = []setAbsolutePathExample{
 		},
 		nil,
 	},
+	// Delete all friends with a name longer than 14 characters
 	{
 		json_map.AbsolutePaths{
 			{
@@ -229,6 +236,22 @@ var exampleSetAbsolutePathInput = []setAbsolutePathExample{
 			},
 		},
 		nil,
+	},
+	// Adds a script to each element in the friends list which contains the "name" key (all)
+	{
+		json_map.AbsolutePaths{
+			{
+				{json_map.RecursiveLookup, "friends"},
+				{json_map.Filter, "@.name"},
+				{json_map.StringKey, "script"},
+			},
+		},
+		fmt.Sprintf("%sjs\n%s\n%s\n%s\n%s\n", utils.ShebangPrefix,
+			"var first_last = json.trail.name.split(' ');",
+			"json.trail['first_name'] = first_last[0];",
+			"json.trail['last_name'] = first_last[1];",
+			"delete json.trail.name;",
+		),
 	},
 }
 
@@ -500,7 +523,7 @@ func TestSetAbsolutePaths(t *testing.T) {
 		// Set the current example value on the JSON map
 		err := jsonMap.SetAbsolutePaths(&exampleAbsolutePaths.absolutePaths, exampleAbsolutePaths.value)
 		if err != nil {
-			t.Errorf("The following error happened whilst setting an absolute path %s: %v", exampleAbsolutePaths.absolutePaths, err)
+			t.Errorf("The following error happened whilst setting an absolute path %s: %v (example %d)", exampleAbsolutePaths.absolutePaths, err, i + 1)
 			continue
 		}
 
@@ -515,6 +538,6 @@ func TestSetAbsolutePaths(t *testing.T) {
 		//fmt.Println(string(b))
 
 		// Check for equality between jsonMap and expected output
-		utils.JsonMapEqualTest(t, insides, exampleSetAbsolutePathOutput[i], fmt.Sprintf("absolute paths: %v and value: %v", exampleAbsolutePaths.absolutePaths, exampleAbsolutePaths.value))
+		utils.JsonMapEqualTest(t, insides, exampleSetAbsolutePathOutput[i], fmt.Sprintf("absolute paths: %v and value: %v (example %d)", exampleAbsolutePaths.absolutePaths, exampleAbsolutePaths.value, i + 1))
 	}
 }

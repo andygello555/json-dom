@@ -1,0 +1,38 @@
+{
+  "person": {
+    "friends": [
+      {
+        "name": "Jane Doe",
+        "age": 24,
+        "script": "#//!js\nvar first_last = json.trail.name.split(' ');\njson.trail['first_name'] = first_last[0];\njson.trail['last_name'] = first_last[1];\ndelete json.trail.name;\n"
+      },
+      {
+        "name": "Bob Smith",
+        "age": 55,
+        "script": "#//!js\nvar first_last = json.trail.name.split(' ');\njson.trail['first_name'] = first_last[0];\njson.trail['last_name'] = first_last[1];\ndelete json.trail.name;\n"
+      },
+      {
+        "name": "Dwayne Johnson",
+        "age": 36,
+        "script": "#//!js\nvar first_last = json.trail.name.split(' ');\njson.trail['first_name'] = first_last[0];\njson.trail['last_name'] = first_last[1];\ndelete json.trail.name;\n"
+      },
+      {
+        "name": "Gary Twain",
+        "age": 40,
+        "script": "#//!js\nvar first_last = json.trail.name.split(' ');\njson.trail['first_name'] = first_last[0];\njson.trail['last_name'] = first_last[1];\ndelete json.trail.name;\n"
+      },
+      {
+        "name": "Elizabeth Swindon",
+        "age": 21,
+        "script": "#//!js\nvar first_last = json.trail.name.split(' ');\njson.trail['first_name'] = first_last[0];\njson.trail['last_name'] = first_last[1];\ndelete json.trail.name;\n"
+      },
+      {
+        "name": "Frank Bob",
+        "script": "#//!js\nvar first_last = json.trail.name.split(' ');\njson.trail['first_name'] = first_last[0];\njson.trail['last_name'] = first_last[1];\ndelete json.trail.name;\n"
+      }
+    ],
+    "name": "John Smith",
+    "age": 18
+  },
+  "over-forty": 40
+}

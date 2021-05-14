@@ -48,7 +48,8 @@ var checkStdoutErr = map[string]map[string][]string{
 			"Print call from: <$>:2:1",
 			"map[_absolutePaths:map[0:map[0:map[key:JaneDoe typeId:0 typeName:StringKey] 1:map[key:friends typeId:0 typeName:StringKey] 2:map[key:map[0:map[key:1 typeId:1 typeName:IndexKey] 1:map[key:3 typeId:1 typeName:IndexKey]] typeId:5 typeName:Slice]]] getValues:map[] setValues:map[]]",
 			"Print call from: <$>:7:1",
-			"map[0:Ava Forster 1:Louis Warren] 2",
+			":Ava Forster",
+			":Louis Warren]",
 			"Print call from: <$>:17:5",
 			"Ava Forster &map[_absolutePaths:map[0:map[0:map[key:friends typeId:7 typeName:RecursiveLookup] 1:map[key:@ == 'Ava Forster' typeId:3 typeName:Filter]]] getValues:map[] setValues:map[]] &map[age:20 name:Ava Forster]",
 			"Louis Warren &map[_absolutePaths:map[0:map[0:map[key:friends typeId:7 typeName:RecursiveLookup] 1:map[key:@ == 'Louis Warren' typeId:3 typeName:Filter]]] getValues:map[] setValues:map[]] &map[age:20 name:Louis Warren]",
@@ -139,7 +140,7 @@ func TestExamples(t *testing.T) {
 								t.Errorf("Halting example panics but it is not a HaltingProblem error: %v", p)
 							}
 						case "unsupported_lang":
-							if !strings.Contains(p.(error).Error(), "(-2) Script has an unsupported script language in the shebang line") {
+							if !strings.Contains(p.(error).Error(), "(-2) Unsupported script language in shebang") {
 								t.Errorf("Unsupported lang example panics but it is not a UnsupportedScriptLang error: %v", p)
 							}
 						}
@@ -163,6 +164,7 @@ func TestExamples(t *testing.T) {
 				for headerTypeKey, headerType := range buffers {
 					for _, header := range printHeaders[headerTypeKey] {
 						if !strings.Contains(headerType.String(), header) {
+							//fmt.Println(headerType.String())
 							t.Errorf("%s for '%s' does not contain the following print header: %s", headerTypeKey, example.name, header)
 						}
 					}

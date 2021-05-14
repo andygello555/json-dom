@@ -1069,6 +1069,22 @@ func (jsonMap *JsonMap) JsonPathSetter(jsonPath string, value interface{}) (err 
 	return err
 }
 
+// Adds the given script of the given shebangName (must be a supported language) at the path pointed to by the given
+// jsonPath.
+// This just validates the given shebangName, constructs the script with the appropriate shebang and runs JsonPathSetter
+// on the given jsonPath with the constructed script as a value.
+func (jsonMap *JsonMap) Markup(jsonPath string, shebangName string, script string) (err error)  {
+	// Check if the shebangName is a valid and supported shebangName
+	if !code.CheckIfSupported(shebangName) {
+		return utils.UnsupportedScriptLang.FillError(shebangName)
+	}
+	// Construct the script
+	constructedScript := fmt.Sprintf("%s%s\n%s", utils.ShebangPrefix, shebangName, script)
+	// Run JsonPathSetter
+	err = jsonMap.JsonPathSetter(jsonPath, constructedScript)
+	return err
+}
+
 // Check if the given string contains a json-dom script.
 // This is done by checking the first line of the string and seeing if it starts with the ShebangPrefix and ends with
 // one of the supported languages.
@@ -1084,7 +1100,7 @@ func CheckIfScript(script string) (isScript bool, shebangScriptLang string) {
 		if shebangPrefix != utils.ShebangPrefix {
 			return false, shebangScriptLang
 		}
-		if !utils.GetSupportedScriptTags()[shebangScriptLang] {
+		if !code.CheckIfSupported(shebangScriptLang) {
 			// We are going to panic here as the script is unsupported
 			// NOTE this will only panic when the shebang script is between the shorted and the longest supported lengths
 			panic(utils.UnsupportedScriptLang.FillError(shebangScriptLang, fmt.Sprintf(utils.ScriptErrorFormatString, utils.AnonymousScriptPath, script)))
