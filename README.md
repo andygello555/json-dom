@@ -259,11 +259,17 @@ At the moment the only available language to write scripts in is Javascript via 
 
 ### Shebangs
 
-The shebang for scripts is `#//!` followed by the script language which are provided below.
+The shebang prefix for scripts is `#//!` followed by a **shebang suffix** which are provided below.
 
 | Shebang suffix | Language                                                               |
 | :------------: | ---------------------------------------------------------------------- |
 |      `js`      | Javascript via [Otto](https://pkg.go.dev/github.com/robertkrimen/otto) |
+
+Shebang requirements:
+- Must be on the first line
+- Must be followed by a newline
+- All multiline string values containing source code within the hjson *without a shebang* will be treated as a **normal string** and **not** a script
+- Any unsupported shebang prefix will cause a panic (unless evaluating from `jom.Eval` which resolves any panics and returns an error)
 
 ### Javascript
 
