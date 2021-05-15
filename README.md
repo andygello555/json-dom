@@ -31,7 +31,41 @@ JSON:
 
 ### CLI
 
-*TODO*
+The CLI application is implemented within `json-dom.go`. It has two main commands: `eval` and `markup`.
+
+- **eval**: Evaluates the given hjson from `-input` or multiple files from `-files`
+- **markup**: Mark up the given hjson from `-input` or multiple files from `-files`
+  - `-path-scripts`: The JSONPath-script pairs which specify where scripts will be inserted in the JSON (see [this section](#json-path-notes) for more info on JSON paths). *This is required*.
+  - `-language`: The language the scripts are written in (see available [shebang suffixes](#shebangs)). *Defaults to `js` for Javascript*.
+  - `-eval`: Whether or not to evaluate the hjson after marking it up. This is identical in process to the `eval` subcommand.
+
+#### Usage/Help
+
+```
+usage: json-dom { eval | markup [-language <language>] [-eval] <key>:<value>,... } { -input <input> | -files <file>... } [-verbose]
+
+eval: Evaluates a given hjson input/file(s)
+  -files value
+        Files to evaluate as json-dom (required if --input not given)
+  -input string
+        The json-dom object to read in (required if <file> is not given)
+  -verbose
+        Verbose output
+
+markup: Mark up the given hjson input/file(s) with the given JSONPath-script pairs
+  -eval
+        Evaluate the JSON map after markup
+  -files value
+        Files to evaluate as json-dom (required if --input not given)
+  -input string
+        The json-dom object to read in (required if <file> is not given)
+  -language string
+        The language which the markups are in (default "js")
+  -path-scripts value
+        The JSONPath-script pairs that should be added to the input json-dom. Format: "<JSON path>:script" (at least 1 required)
+  -verbose
+        Verbose output
+```
 
 ### Go Package
 
@@ -223,6 +257,14 @@ order**.
 
 At the moment the only available language to write scripts in is Javascript via [otto](https://pkg.go.dev/github.com/robertkrimen/otto)
 
+### Shebangs
+
+The shebang for scripts is `#//!` followed by the script language which are provided below.
+
+| Shebang suffix | Language                                                               |
+| :------------: | ---------------------------------------------------------------------- |
+|      `js`      | Javascript via [Otto](https://pkg.go.dev/github.com/robertkrimen/otto) |
+
 ### Javascript
 
 Scripts are run using the [otto](https://pkg.go.dev/github.com/robertkrimen/otto) interpreter available for Go. Therefore, all the caveats that exist within otto also exist when using Javascript in json-dom. Among other [things](https://pkg.go.dev/github.com/robertkrimen/otto#hdr-Caveat_Emptor) the following caveats exist:
@@ -241,7 +283,7 @@ Scripts are run using the [otto](https://pkg.go.dev/github.com/robertkrimen/otto
 #### Builtin functions
 
 | Name                    | Params      | Returns   | Description                                                                                                                       |
-|:------------------------|:------------|:----------|:----------------------------------------------------------------------------------------------------------------------------------|
+| :---------------------- | :---------- | :-------- | :-------------------------------------------------------------------------------------------------------------------------------- |
 | `printlnExternal`       | `...Object` | Nothing   | Legacy version of `console.log`                                                                                                   |
 | `console.log`           | `...Object` | Nothing   | Will print to stdout                                                                                                              |
 | `console.error`         | `...Object` | Nothing   | Will print to stderr                                                                                                              |
@@ -250,7 +292,7 @@ Scripts are run using the [otto](https://pkg.go.dev/github.com/robertkrimen/otto
 #### Builtin symbols
 
 | Name              | Type   | Description                                                                                                                                                                                                                    |
-|:------------------|:-------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| :---------------- | :----- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `json`            | Object | The JOM. Aka. the JSON Document. Contains helpers and properties to aid with JSON manipulation.                                                                                                                                |
 | `json.trail`      | Object | Contains a replica of the key-value pairs of the JSON at the script's scope level. Any changes to it will be reflected in the final output JSON.                                                                               |
 | `json.scriptPath` | String | The JSON path to the current scope. Mostly just used by the `console` object to print out where a print came from.                                                                                                             |

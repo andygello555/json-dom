@@ -121,5 +121,6 @@ type JsonMapInt interface {
 	Marshal() (out []byte, err error)
 	Run()
 	SetAbsolutePaths(absolutePaths *AbsolutePaths, value interface{}) (err error)
+	String() string
 	Unmarshal(jsonBytes []byte) (err error)
 }

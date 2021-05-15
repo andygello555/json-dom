@@ -19,11 +19,13 @@ var (
 	ParseErr            = CliError{1, true, "Parse error has occurred"}
 	FormatErr           = CliError{2, true, "Format error has occurred"}
 	ReadFileErr			= CliError{3, true, "A read file error occurred"}
-	KeyValueErr         = CliError{4, false, "Error while handling Key Value flag"}
 	SubcommandErr       = CliError{5, false, "Subcommand not given/not recognised"}
 	RequiredFlagErr     = CliError{6, false, "The following required flag was not given"}
 	FileDoesNotExistErr = CliError{7, false, "The following file does not exist and cannot be read"}
-	EvaluationErr		= CliError{8, false, "EVAL ERROR"}
+	MarshalErr			= CliError{8, false, "The following JsonMap cannot be marshalled for the following reasons"}
+	UnmarshalErr		= CliError{9, false, "The following data cannot be unmarshalled for the following reasons"}
+	EvaluationErr		= CliError{10, false, "EVAL ERROR"}
+	MarkupErr			= CliError{11, false, "MARKUP ERROR"}
 )
 
 func (e *CliError) Handle(err error, flagSetArray ...*flag.FlagSet) {
@@ -38,7 +40,10 @@ func (e *CliError) Handle(err error, flagSetArray ...*flag.FlagSet) {
 		if len(flagSetArray) == 0 {
 			flag.PrintDefaults()
 		} else {
-			flagSetArray[0].PrintDefaults()
+			for _, flagSet := range flagSetArray {
+				fmt.Printf("\n%s: %s\n", flagSet.Name(), CliSubcommandDescriptions()[flagSet.Name()])
+				flagSet.PrintDefaults()
+			}
 		}
 	}
 

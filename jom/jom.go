@@ -1338,7 +1338,7 @@ func Eval(jsonBytes []byte, verbose bool) (out []byte, err error) {
 	jsonMap.Run()
 
 	if verbose {
-		fmt.Println("\nJomMap:", jsonMap.insides)
+		fmt.Println("\ngo map:", jsonMap.insides)
 	}
 
 	// Marshal the output JSON
@@ -1347,4 +1347,20 @@ func Eval(jsonBytes []byte, verbose bool) (out []byte, err error) {
 		return out, err
 	}
 	return out, nil
+}
+
+// Marshals the JsonMap into hjson and returns the stringified byte array
+func (jsonMap *JsonMap) String() string {
+	var err error
+	var out []byte
+	if !jsonMap.Array {
+		out, err = hjson.Marshal(jsonMap.insides)
+	} else {
+		// FIXME: Handle the root array hack
+		out, err = hjson.Marshal(jsonMap.insides["array"])
+	}
+	if err != nil {
+		panic(err)
+	}
+	return string(out)
 }

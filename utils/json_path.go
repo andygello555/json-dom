@@ -267,7 +267,7 @@ func ParseJsonPath(jsonPath string) (absolutePaths json_map.AbsolutePaths, err e
 	currentState := &root
 	jsonPathReader := bufio.NewReader(strings.NewReader(jsonPath))
 
-	for _, state := range []*state{&root, &dot, &index, &filter, &property} {
+	for _, state := range []*state{&root, &dot, &index, &filter, &property, &recursiveLookup} {
 		state.tokenRegex.Longest()
 	}
 

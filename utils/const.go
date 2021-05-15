@@ -21,3 +21,10 @@ const (
 var (
 	HaltingDelay = 4
 )
+
+func CliSubcommandDescriptions() map[string]string {
+	return map[string]string{
+		"eval": "Evaluates a given hjson input/file(s)",
+		"markup": "Mark up the given hjson input/file(s) with the given JSONPath-script pairs",
+	}
+}

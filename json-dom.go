@@ -29,15 +29,15 @@ func (s *Files) Set(value string) error {
 	return nil
 }
 
-// Flag Type for a KeyValuePair flag
-type KeyValuePair map[string]string
+// Flag Type for a JsonPathScriptPair flag
+type JsonPathScriptPair map[string]string
 
-// Returns the String representation of the Files flag
-func (kvp *KeyValuePair) String() string {
+// Returns the String representation of the JsonPathScriptPair flag
+func (jpscp *JsonPathScriptPair) String() string {
 	// a=b, c=d, ...
 	var b strings.Builder
-	for key, element := range *kvp {
-		_, err := fmt.Fprintf(&b, "%v%v%v,", key, utils.KeyValuePairDelim, element)
+	for key, element := range *jpscp {
+		_, err := fmt.Fprintf(&b, "%v%c%v,", key, utils.KeyValuePairDelim, element)
 		if err != nil {
 			utils.FormatErr.Handle(err)
 		}
@@ -53,31 +53,36 @@ func (kvp *KeyValuePair) String() string {
 }
 
 // Sets the value of the Files flag
-func (kvp *KeyValuePair) Set(value string) error {
-	keyVals := strings.Split(value, ",")
-	*kvp = make(KeyValuePair)
-	for _, keyVal := range keyVals {
-		keyValArray := strings.Split(keyVal, string(utils.KeyValuePairDelim))
+func (jpscp *JsonPathScriptPair) Set(value string) error {
+	jsonPathScripts := strings.Split(value, ",")
+	*jpscp = make(JsonPathScriptPair)
+	for _, jsonPathScript := range jsonPathScripts {
+		jsonPathScriptArr := strings.Split(jsonPathScript, string(utils.KeyValuePairDelim))
 		// Throw an error if len is 0, aka: string is "="
-		if len(keyValArray) == 0 {
-			return errors.New(fmt.Sprintf("%v is not a pair (syntax is 'key%vvalue')", keyVal, utils.KeyValuePairDelim))
+		if len(jsonPathScriptArr) == 0 {
+			return errors.New(fmt.Sprintf("%v is not a pair (syntax is \"<JSON path>%c<script>\")", jsonPathScript, utils.KeyValuePairDelim))
 		}
 		// Throw error if there is more than one delim in the string
-		if len(keyValArray) > 2 {
-			return errors.New(fmt.Sprintf("%v is not a pair (must only be a single %v char)", keyVal, utils.KeyValuePairDelim))
+		if len(jsonPathScriptArr) > 2 {
+			return errors.New(fmt.Sprintf("%v is not a pair (must only be a single \"%c\" char)", jsonPathScript, utils.KeyValuePairDelim))
 		}
 
-		if len(keyValArray) == 1 {
+		// Check if the json path given is valid
+		if _, err := utils.ParseJsonPath(jsonPathScriptArr[0]); err != nil {
+			return err
+		}
+
+		if len(jsonPathScriptArr) == 1 {
 			// Use the default value of "0" if no value is specified
-			(*kvp)[keyValArray[0]] = "0"
+			(*jpscp)[jsonPathScriptArr[0]] = "// No script specified"
 		} else {
-			(*kvp)[keyValArray[0]] = keyValArray[1]
+			(*jpscp)[jsonPathScriptArr[0]] = jsonPathScriptArr[1]
 		}
 	}
 	return nil
 }
 
-// usage: json-dom {eval|markup <key>:<value>,...} {-i <input> | <file>...} [-d <file>] [-v]
+// usage: json-dom { eval | markup [-language <language>] [-eval] <key>:<value>,... } { -input <input> | -files <file>... } [-verbose]
 
 func main() {
 	// Subcommands
@@ -95,21 +100,24 @@ func main() {
 		fileList := new(Files)
 		flagSet := element["flagSet"].(*flag.FlagSet)
 		subcommandMap[key]["files"] = fileList
-		subcommandMap[key]["input"] = flagSet.String("input", "", "The json-dom object to read in (Required if <file> is not given)")
+		subcommandMap[key]["input"] = flagSet.String("input", "", "The json-dom object to read in (required if <file> is not given)")
 		subcommandMap[key]["verbose"] = flagSet.Bool("verbose", false, "Verbose output")
 
-		// Add the extra KeyValuePair flag to the markup subcommand
+		// Add the extra JsonPathScriptPair flag, language flag and eval flag to the markup subcommand
 		if key == "markup" {
-			keyValPair := new(KeyValuePair)
-			subcommandMap[key]["key-vals"] = keyValPair
-			flagSet.Var(keyValPair, "key-vals", "The key value pairs that should be added to the input json-dom (Required)")
+			keyValPair := new(JsonPathScriptPair)
+			subcommandMap[key]["path-scripts"] = keyValPair
+			flagSet.Var(keyValPair, "path-scripts", fmt.Sprintf("The JSONPath-script pairs that should be added to the input json-dom. Format: \"<JSON path>%cscript\" (at least 1 required)", utils.KeyValuePairDelim))
+			subcommandMap[key]["language"] = flagSet.String("language", "js", "The language which the markups are in")
+			subcommandMap[key]["eval"] = flagSet.Bool("eval", false, "Evaluate the JSON map after markup")
 		}
-		flagSet.Var(fileList, "files", "Files to evaluate as json-dom (Required if --input not given)")
+		flagSet.Var(fileList, "files", "Files to evaluate as json-dom (required if --input not given)")
 	}
 
 	// Verify a subcommand has been given
 	if len(os.Args) < 2 {
-		utils.SubcommandErr.Handle(nil)
+		utils.SubcommandErr.Handle(nil, subcommandMap["eval"]["flagSet"].(*flag.FlagSet),
+			subcommandMap["markup"]["flagSet"].(*flag.FlagSet))
 	}
 
 	var parseErr error
@@ -121,7 +129,8 @@ func main() {
 		flagSet := subcommandMap[os.Args[1]]["flagSet"].(*flag.FlagSet)
 		parseErr = flagSet.Parse(flags)
 	default:
-		utils.SubcommandErr.Handle(nil)
+		utils.SubcommandErr.Handle(nil, subcommandMap["eval"]["flagSet"].(*flag.FlagSet),
+			subcommandMap["markup"]["flagSet"].(*flag.FlagSet))
 	}
 
 	// Handle any parse errors
@@ -130,7 +139,7 @@ func main() {
 	}
 
 	// Check which subcommand was parsed and handle it
-	for _, element := range subcommandMap {
+	for subcommand, element := range subcommandMap {
 		flagSet := element["flagSet"].(*flag.FlagSet)
 		verbose := *element["verbose"].(*bool)
 
@@ -141,12 +150,14 @@ func main() {
 			for flagKey, flagElement := range element {
 				if flagKey != "flagSet" {
 					switch flagKey {
-					case "key-vals":
+					case "path-scripts":
 						fallthrough
 					case "files":
 						fmt.Printf(formatString, flagKey, flagElement)
+					case "eval":
+						fallthrough
 					case "verbose":
-						fmt.Printf(formatString, flagKey, verbose)
+						fmt.Printf(formatString, flagKey, *flagElement.(*bool))
 					default:
 						// Default just casts the pointer to a string pointer and takes the value at the location
 						fmt.Printf(formatString, flagKey, *flagElement.(*string))
@@ -160,10 +171,10 @@ func main() {
 			filesPtr := element["files"].(*Files)
 			inputPtr := element["input"].(*string)
 
+			dataSet := make(map[string][]byte, 0)
 			if len(*filesPtr) != 0 || *inputPtr != "" {
-				var data []byte
-
 				// If both a file and a stdin input is given then evaluate the files first
+				var data []byte
 				if len(*filesPtr) != 0 {
 					if verbose {
 						fmt.Println("\nfiles:")
@@ -192,25 +203,80 @@ func main() {
 						if err != nil {
 							utils.ReadFileErr.Handle(err)
 						}
+						dataSet[file] = data
 					}
 				} else {
 					// Convert the input to a byte buffer
 					data = []byte(*inputPtr)
+					dataSet["stdin"] = data
 				}
-
-				// Evaluate the json-dom object
-				eval, err := jom.Eval(data, verbose)
-				if err != nil {
-					utils.EvaluationErr.Handle(err)
-				}
-
-				// TODO: This is where saving to a destination file would come in
-				fmt.Println(string(eval))
 			} else {
 				// Files and input not given so throw RequiredFlagErr
 				utils.RequiredFlagErr.Handle(errors.New("files or input (one of these must be given)"),
 					element["flagSet"].(*flag.FlagSet))
 			}
+
+			for dataName, data := range dataSet {
+				if verbose {
+					fmt.Printf("\n%s:\n", dataName)
+				}
+				switch subcommand {
+				case "eval":
+					// Evaluate the json-dom object
+					eval, err := jom.Eval(data, verbose)
+					if err != nil {
+						utils.EvaluationErr.Handle(err)
+					}
+
+					// TODO: This is where saving to a destination file would come in
+					fmt.Println(string(eval))
+				case "markup":
+					pathScripts := element["path-scripts"].(*JsonPathScriptPair)
+					language := element["language"].(*string)
+					eval := element["eval"].(*bool)
+
+					// Check if any JSONPath-script pairs are present
+					if len(*pathScripts) == 0 {
+						// No path-scripts given so throw RequiredFlagErr
+						utils.RequiredFlagErr.Handle(errors.New(
+							fmt.Sprintf("a single path-script must be supplied as a \"<JSON path>%c<script>\" pair",
+								utils.KeyValuePairDelim)),
+							element["flagSet"].(*flag.FlagSet),
+						)
+					}
+
+					// Unmarshal the data to a JsonMap
+					jsonMap := jom.New()
+					err := jsonMap.Unmarshal(data)
+					if err != nil {
+						utils.UnmarshalErr.Handle(errors.New(fmt.Sprintf("data: %s, err: %v", string(data), err)))
+					}
+
+					// Run the Markup for all paths
+					for path, script := range *pathScripts {
+						err = jsonMap.Markup(path, *language, script)
+						if err != nil {
+							utils.MarkupErr.Handle(err)
+						}
+					}
+
+					if *eval {
+						if data, err = jsonMap.Marshal(); err != nil {
+							utils.MarshalErr.Handle(errors.New(fmt.Sprintf("JsonMap: %s, err: %v", jsonMap, err)))
+						}
+
+						var evalOut []byte
+						evalOut, err = jom.Eval(data, verbose)
+						if err != nil {
+							utils.EvaluationErr.Handle(err)
+						}
+						fmt.Println(string(evalOut))
+					} else {
+						fmt.Println(jsonMap)
+					}
+				}
+			}
+
 			os.Exit(0)
 		}
 	}
