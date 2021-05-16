@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	_ "github.com/andygello555/json-dom/code/go"
 	_ "github.com/andygello555/json-dom/code/js"
 	"github.com/andygello555/json-dom/jom"
 	"github.com/andygello555/json-dom/utils"
@@ -82,7 +83,7 @@ func (jpscp *JsonPathScriptPair) Set(value string) error {
 	return nil
 }
 
-// usage: json-dom { eval | markup [-language <language>] [-eval] <key>:<value>,... } { -input <input> | -files <file>... } [-verbose]
+// usage: json-dom { eval | markup [-language <language>] [-eval] [-strip] <key>:<value>,... } { -input <input> | -files <file>... } [-verbose]
 
 func main() {
 	// Subcommands
@@ -108,8 +109,10 @@ func main() {
 			keyValPair := new(JsonPathScriptPair)
 			subcommandMap[key]["path-scripts"] = keyValPair
 			flagSet.Var(keyValPair, "path-scripts", fmt.Sprintf("The JSONPath-script pairs that should be added to the input json-dom. Format: \"<JSON path>%cscript\" (at least 1 required)", utils.KeyValuePairDelim))
+
 			subcommandMap[key]["language"] = flagSet.String("language", "js", "The language which the markups are in")
 			subcommandMap[key]["eval"] = flagSet.Bool("eval", false, "Evaluate the JSON map after markup")
+			subcommandMap[key]["strip"] = flagSet.Bool("strip", false, "Strip any existing script key-value pairs from the JSON")
 		}
 		flagSet.Var(fileList, "files", "Files to evaluate as json-dom (required if --input not given)")
 	}
@@ -154,9 +157,7 @@ func main() {
 						fallthrough
 					case "files":
 						fmt.Printf(formatString, flagKey, flagElement)
-					case "eval":
-						fallthrough
-					case "verbose":
+					case "verbose", "eval", "strip":
 						fmt.Printf(formatString, flagKey, *flagElement.(*bool))
 					default:
 						// Default just casts the pointer to a string pointer and takes the value at the location
@@ -234,6 +235,7 @@ func main() {
 					pathScripts := element["path-scripts"].(*JsonPathScriptPair)
 					language := element["language"].(*string)
 					eval := element["eval"].(*bool)
+					strip := element["strip"].(*bool)
 
 					// Check if any JSONPath-script pairs are present
 					if len(*pathScripts) == 0 {
@@ -252,9 +254,14 @@ func main() {
 						utils.UnmarshalErr.Handle(errors.New(fmt.Sprintf("data: %s, err: %v", string(data), err)))
 					}
 
+					// Strip script key-value pairs if strip flag is set
+					if *strip {
+						jsonMap.Strip()
+					}
+
 					// Run the Markup for all paths
 					for path, script := range *pathScripts {
-						err = jsonMap.Markup(path, *language, script)
+						err = jsonMap.MarkupCode(path, *language, script)
 						if err != nil {
 							utils.MarkupErr.Handle(err)
 						}

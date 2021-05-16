@@ -110,7 +110,7 @@ func CopyMap(m map[string]interface{}) map[string]interface{} {
 func JsonMapEqualTest(t *testing.T, actual, expected interface{}, forString string) {
 	if diff := deep.Equal(actual, expected); diff != nil {
 		var errB strings.Builder
-		errB.WriteString(fmt.Sprintf("Difference between actual and expected for %s (Left = Expected, Right = Actual)\n", forString))
+		errB.WriteString(fmt.Sprintf("Difference between actual and expected for %s (Left = Actual, Right = Expected)\n", forString))
 		for _, d := range diff {
 			errB.WriteString(fmt.Sprintf("\t%s\n", d))
 		}

@@ -1073,7 +1073,7 @@ func (jsonMap *JsonMap) JsonPathSetter(jsonPath string, value interface{}) (err 
 // jsonPath.
 // This just validates the given shebangName, constructs the script with the appropriate shebang and runs JsonPathSetter
 // on the given jsonPath with the constructed script as a value.
-func (jsonMap *JsonMap) Markup(jsonPath string, shebangName string, script string) (err error)  {
+func (jsonMap *JsonMap) MarkupCode(jsonPath string, shebangName string, script string) (err error)  {
 	// Check if the shebangName is a valid and supported shebangName
 	if !code.CheckIfSupported(shebangName) {
 		return utils.UnsupportedScriptLang.FillError(shebangName)
@@ -1113,13 +1113,11 @@ func CheckIfScript(script string) (isScript bool, shebangScriptLang string) {
 // Finds all the script and non-script fields within a JsonMap.
 // Updates the script and nonScript fields within the JsonMap's traversal object.
 func (jsonMap *JsonMap) FindScriptFields() (found bool) {
-	// Map to keep the script key values and map to keep all key values apart from the script fields
-
 	// Indicates whether a script tag has been found at the current depth or a nested depth. Used to indicate when to
 	// join a scriptFields subtree to its parent tree.
 	found = false
 
-	for key, element := range (*jsonMap).insides {
+	for key, element := range *(jsonMap.GetInsides()) {
 		switch element.(type) {
 		case map[string]interface{}:
 			// Recurse down the inner map
@@ -1165,12 +1163,12 @@ func (jsonMap *JsonMap) FindScriptFields() (found bool) {
 			}
 			// Always join nonScriptArrayInner back into the main tree (nonScriptFields)
 			jsonMap.traversal.nonScript[key] = nonScriptArrayInner
-		case string:
+		case func(json json_map.JsonMapInt), string:
 			// Check if the element contains a script
-			if isScript, _ := CheckIfScript(element.(string)); isScript {
-				// If it is then add the key to the scriptFields map and set found to true
+			if runnable, ok := code.NewFrom(element); ok {
+				// If it is then add the key to the script map as a Code object and set found to true
 				found = true
-				jsonMap.traversal.script[key] = element
+				jsonMap.traversal.script[key] = runnable
 			} else {
 				// Add the field to the nonScriptFields map
 				jsonMap.traversal.nonScript[key] = element
@@ -1179,9 +1177,19 @@ func (jsonMap *JsonMap) FindScriptFields() (found bool) {
 			// Add the field to the nonScriptFields map
 			jsonMap.traversal.nonScript[key] = element
 		}
+		// FIXME: I don't know why this needs to be here but apparently it does otherwise go callback scripts (func(json json_map.JsonMapInt)) at a depth greater than 1 will be deleted?
+		(*jsonMap).insides[key] = element
 	}
 
 	return found
+}
+
+// Strips any script key-value pairs found within the JsonMap and updates it in place.
+// This is essentially just a wrapper for FindScriptFields which just sets insides to be traversal.nonScript.
+func (jsonMap *JsonMap) Strip() {
+	if jsonMap.FindScriptFields() {
+		jsonMap.insides = jsonMap.traversal.nonScript
+	}
 }
 
 // Given a JsonMap this will traverse it and execute all scripts. Will update the given JsonMap in place.
@@ -1213,7 +1221,7 @@ func (jsonMap *JsonMap) Run() {
 	scriptQueue := make(utils.StringHeap, 0)
 	for k, e := range jsonMap.traversal.script {
 		switch e.(type) {
-		case string:
+		case code.Code:
 			scriptQueue = append(scriptQueue, k)
 		default:
 			continue
@@ -1228,15 +1236,14 @@ func (jsonMap *JsonMap) Run() {
 		scriptKey := heap.Pop(&scriptQueue).(string)
 
 		// Get the script language by CheckIfScript
-		script := jsonMap.traversal.script[scriptKey].(string)
-		_, scriptLang := CheckIfScript(script)
+		script := jsonMap.traversal.script[scriptKey].(code.Code)
 
 		// Run the script for the script's language. This will...
 		// 1. Create the JOM object, setup any builtin functions and insert the JOM into the script environment
 		// 2. Setup any interrupts for the halting problem
 		// 3. Extract and decode the JOM from the environment and return it
 		// Any errors that occur have to be panicked as they can effect the entire runtime
-		newScope, err := code.Run(scriptLang, script, jsonMap)
+		newScope, err := code.Run(script, jsonMap)
 		if err != nil {
 			panic(err)
 		}

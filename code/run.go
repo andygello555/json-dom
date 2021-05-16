@@ -10,7 +10,7 @@ type SupportedLang struct {
 	// The suffix of the shebang
 	shebangName string
 	// The function that will run the given script in the given scope
-	runScript   func(script string, jsonMap json_map.JsonMapInt) (data json_map.JsonMapInt, err error)
+	runCode     func(code Code, jsonMap json_map.JsonMapInt) (data json_map.JsonMapInt, err error)
 }
 
 // All the scripting languages currently supported.
@@ -24,21 +24,21 @@ func CheckIfSupported(scriptLang string) bool {
 
 // Registers a new SupportedLang to the supportedLangs map.
 // Every supported language package should call this within their init().
-func RegisterLang(shebangName string, runScript func(script string, jsonMap json_map.JsonMapInt) (data json_map.JsonMapInt, err error)) bool {
+func RegisterLang(shebangName string, runCode func(code Code, jsonMap json_map.JsonMapInt) (data json_map.JsonMapInt, err error)) bool {
 	supportedLangs[shebangName] = &SupportedLang{
 		shebangName: shebangName,
-		runScript:   runScript,
+		runCode:     runCode,
 	}
 	return true
 }
 
-// Run the given script in the given script environment.
+// Run the given Code in the given Code environment.
 // Returns a json_map.JsonMapInt containing the updated scope, and a non-nil error if an error has occurred, otherwise
 // err will be nil.
-func Run(scriptLang string, script string, jsonMap json_map.JsonMapInt) (data json_map.JsonMapInt, err error) {
-	if supportedLang, ok := supportedLangs[scriptLang]; ok {
-		return supportedLang.runScript(script, jsonMap)
+func Run(code Code, jsonMap json_map.JsonMapInt) (data json_map.JsonMapInt, err error) {
+	if supportedLang, ok := supportedLangs[code.ScriptLangShebang()]; ok {
+		return supportedLang.runCode(code, jsonMap)
 	}
 	//fmt.Println(supportedLangs)
-	return nil, utils.UnsupportedScriptLang.FillError(scriptLang, fmt.Sprintf(utils.ScriptErrorFormatString, jsonMap.GetCurrentScopePath(), script))
+	return nil, utils.UnsupportedScriptLang.FillError(code.ScriptLangShebang(), fmt.Sprintf(utils.ScriptErrorFormatString, jsonMap.GetCurrentScopePath(), "func(json json_map.JsonMapInt)"))
 }

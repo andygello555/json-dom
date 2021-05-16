@@ -31,7 +31,7 @@ JSON:
 
 ### CLI
 
-The CLI application is implemented within `json-dom.go`. It has two main commands: `eval` and `markup`.
+The CLI application is implemented within `json-dom.go`. To build the executable run: `go build json-dom.go`. The CLI app has two main commands: `eval` and `markup`.
 
 - **eval**: Evaluates the given hjson from `-input` or multiple files from `-files`
 - **markup**: Mark up the given hjson from `-input` or multiple files from `-files`
@@ -42,7 +42,7 @@ The CLI application is implemented within `json-dom.go`. It has two main command
 #### Usage/Help
 
 ```
-usage: json-dom { eval | markup [-language <language>] [-eval] <key>:<value>,... } { -input <input> | -files <file>... } [-verbose]
+usage: json-dom { eval | markup [-language <language>] [-eval] [-strip] <key>:<value>,... } { -input <input> | -files <file>... } [-verbose]
 
 eval: Evaluates a given hjson input/file(s)
   -files value
@@ -63,6 +63,8 @@ markup: Mark up the given hjson input/file(s) with the given JSONPath-script pai
         The language which the markups are in (default "js")
   -path-scripts value
         The JSONPath-script pairs that should be added to the input json-dom. Format: "<JSON path>:script" (at least 1 required)
+  -strip
+        Strip any existing script key-value pairs from the JSON
   -verbose
         Verbose output
 ```
@@ -255,8 +257,6 @@ order**.
 
 ## Available languages
 
-At the moment the only available language to write scripts in is Javascript via [otto](https://pkg.go.dev/github.com/robertkrimen/otto)
-
 ### Shebangs
 
 The shebang prefix for scripts is `#//!` followed by a **shebang suffix** which are provided below.
@@ -273,7 +273,7 @@ Shebang requirements:
 
 ### Javascript
 
-Scripts are run using the [otto](https://pkg.go.dev/github.com/robertkrimen/otto) interpreter available for Go. Therefore, all the caveats that exist within otto also exist when using Javascript in json-dom. Among other [things](https://pkg.go.dev/github.com/robertkrimen/otto#hdr-Caveat_Emptor) the following caveats exist:
+Scripts are run using the [otto](https://pkg.go.dev/github.com/robertkrimen/otto) interpreter written in Go. Therefore, all the caveats that exist within otto also exist when using Javascript in json-dom. Among other [things](https://pkg.go.dev/github.com/robertkrimen/otto#hdr-Caveat_Emptor) the following caveats exist:
 - "use strict" will parse but does nothing.
 - The regular expression engine (re2/regexp) is not fully compatible with the ECMA5 specification.
   - Lookaheads
@@ -303,6 +303,46 @@ Scripts are run using the [otto](https://pkg.go.dev/github.com/robertkrimen/otto
 | `json.trail`      | Object | Contains a replica of the key-value pairs of the JSON at the script's scope level. Any changes to it will be reflected in the final output JSON.                                                                               |
 | `json.scriptPath` | String | The JSON path to the current scope. Mostly just used by the `console` object to print out where a print came from.                                                                                                             |
 | `console`         | Object | The standard `console` object you know and love. Currently, the only supported methods are `log` and `error`. Both print the JSON path location to the call. The former will print to stdout. The latter will print to stderr. |
+
+### Go
+
+Scripts can be written in native Go. This can only be done by using the `JsonPathSetter` and `SetAbsolutePaths` referrer functions available for `JsonMap`. Functions must have the signature: `func(json_map.JsonMapInt)`.
+
+#### Example
+
+If you had a `jom.JsonMap` containing the following JSON...
+
+```json
+{
+  "name": "John Smith"
+}
+```
+
+You could then use `JsonPathSetter` or `SetAbsolutePaths` to insert a native Go function into the JOM...
+
+```go
+// This is the function that will be run in the scope
+callback := func(json json_map.JsonMapInt) {
+  name, _ := json.JsonPathSelector("$.name")
+  firstLast := strings.Split(name[0].Value.(string), " ")
+  _ = json.JsonPathSetter("$.first_name", firstLast[0])
+  _ = json.JsonPathSetter("$.last_name", firstLast[1])
+  _ = json.JsonPathSetter("$.name", nil)
+}
+
+// If your JsonMap was in a variable named "jsonMap"
+jsonMap.JsonPathSetter("$.script", callback)
+// Or using SetAbsolutePaths...
+jsonMap.SetAbsolutePaths(json_map.AbsolutePaths{
+  {
+    {json_map.StringKey, "script"},
+  },
+}, callback)
+```
+
+#### Caveats
+
+Although there are no symbols/builtins passed into these "callbacks" you can utilise all available referrer methods for `json_map.JsonMapInt` to get the same effects as many of the available builtins you would find in the Javascript execution environment. 
 
 ## JSON path notes
 

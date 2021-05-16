@@ -449,7 +449,8 @@ func deJomIfy(jsonMap json_map.JsonMapInt, env *otto.Otto) (data json_map.JsonMa
 // 5. The script is run
 // 6. The environment is De-JOM-ified
 // 7. The new json_map.JsonMapInt is returned
-func RunScript(script string, jsonMap json_map.JsonMapInt) (data json_map.JsonMapInt, err error) {
+func RunScript(code code.Code, jsonMap json_map.JsonMapInt) (data json_map.JsonMapInt, err error) {
+	script := code.Script.(string)
 	// Create the VM and register all builtins
 	vm := otto.New()
 	// Register all builtins
@@ -473,9 +474,6 @@ func RunScript(script string, jsonMap json_map.JsonMapInt) (data json_map.JsonMa
 			panic(err)
 		}
 	}
-
-	// Remove the shebang line from the script
-	script = strings.Join(strings.Split(script, "\n")[1:], "\n")
 
 	// To stop infinite loops start a timer which will panic once the timer stops and be caught in a deferred func
 	start := time.Now()
