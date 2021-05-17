@@ -1,5 +1,24 @@
-# json-dom
+# json-dom<!-- omit in toc -->
 Embedded JSON manipulation using [Hjson](https://hjson.github.io/) and Go
+
+- [What?](#what)
+- [How?](#how)
+  - [CLI](#cli)
+    - [Usage/Help](#usagehelp)
+  - [Go Package](#go-package)
+  - [Example usage](#example-usage)
+  - [Scope](#scope)
+  - [Order execution](#order-execution)
+- [Available languages](#available-languages)
+  - [Shebangs](#shebangs)
+  - [Javascript](#javascript)
+    - [Builtin functions](#builtin-functions)
+    - [Builtin symbols](#builtin-symbols)
+  - [Go](#go)
+    - [Example](#example)
+    - [Caveats](#caveats)
+- [JSON path notes](#json-path-notes)
+- [More examples...](#more-examples)
 
 ## What?
 
@@ -37,7 +56,8 @@ The CLI application is implemented within `json-dom.go`. To build the executable
 - **markup**: Mark up the given hjson from `-input` or multiple files from `-files`
   - `-path-scripts`: The JSONPath-script pairs which specify where scripts will be inserted in the JSON (see [this section](#json-path-notes) for more info on JSON paths). *This is required*.
   - `-language`: The language the scripts are written in (see available [shebang suffixes](#shebangs)). *Defaults to `js` for Javascript*.
-  - `-eval`: Whether or not to evaluate the hjson after marking it up. This is identical in process to the `eval` subcommand.
+  - `-eval`: Whether to evaluate the hjson after marking it up. This is identical in process to the `eval` subcommand.
+  - `-strip`: Whether to strip the hjson of any key-value pairs containing scripts before marking it up
 
 #### Usage/Help
 
@@ -261,9 +281,10 @@ order**.
 
 The shebang prefix for scripts is `#//!` followed by a **shebang suffix** which are provided below.
 
-| Shebang suffix | Language                                                               |
-| :------------: | ---------------------------------------------------------------------- |
-|      `js`      | Javascript via [Otto](https://pkg.go.dev/github.com/robertkrimen/otto) |
+| Shebang suffix | Language                                                                              |
+| :------------: | ------------------------------------------------------------------------------------- |
+|      `js`      | Javascript via [Otto](https://pkg.go.dev/github.com/robertkrimen/otto)                |
+|      `go`      | Native Go via `func(json json_map.JsonMapInt)` callbacks (shebang itself is not used) |
 
 Shebang requirements:
 - Must be on the first line
@@ -306,7 +327,7 @@ Scripts are run using the [otto](https://pkg.go.dev/github.com/robertkrimen/otto
 
 ### Go
 
-Scripts can be written in native Go. This can only be done by using the `JsonPathSetter` and `SetAbsolutePaths` referrer functions available for `JsonMap`. Functions must have the signature: `func(json_map.JsonMapInt)`.
+Scripts can be written in native Go using function callbacks. Functions can only be added to the JOM using the `JsonPathSetter` and `SetAbsolutePaths` referrer functions available for `JsonMap`. Added functions must have the signature: `func(json_map.JsonMapInt)` for them to be called by `jom.Eval`/`jom.Run`.
 
 #### Example
 
@@ -340,9 +361,11 @@ jsonMap.SetAbsolutePaths(json_map.AbsolutePaths{
 }, callback)
 ```
 
+After evaluation this would result in the same JSON output as the one at the [start](#what) of this document.
+
 #### Caveats
 
-Although there are no symbols/builtins passed into these "callbacks" you can utilise all available referrer methods for `json_map.JsonMapInt` to get the same effects as many of the available builtins you would find in the Javascript execution environment. 
+Although there are no symbols/builtins passed into these "callbacks" you can utilise all available referrer methods for `json_map.JsonMapInt` to get the same effect as many of the available builtins you would find in the Javascript execution environment. 
 
 ## JSON path notes
 

@@ -48,7 +48,7 @@
         // This just normalises all elements within the "friends" key's value to all have a similar "name" and "age"
         // structure by utilising the JSON path filter expressions
         var basePath = "$..friends";
-        var stringSet = json.jsonPathSelector("$..friends[?(typeof @ == 'string')]");
+        var stringSet = json.jsonPathSelector(basePath + "[?(typeof @ == 'string')]");
         var nodes = stringSet.getValues()
         console.log(nodes, nodes.length);
 
