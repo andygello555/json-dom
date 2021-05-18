@@ -19,6 +19,7 @@ Embedded JSON manipulation using [Hjson](https://hjson.github.io/) and Go
     - [Caveats](#caveats)
 - [JSON path notes](#json-path-notes)
 - [More examples...](#more-examples)
+- [Future](#future)
 
 ## What?
 
@@ -384,3 +385,15 @@ The main functions/symbols relating to JSON path functionality:
 ## More examples...
 
 Check out [`assets/tests/examples`](assets/tests/examples) for some more examples and [`assets/tests/example_out`](assets/tests/example_out) for their corresponding evaluated JSON.
+
+## Future
+
+- More supported languages via bindings/interpreters/VMs however
+  - Python
+  - Lua
+- Some better native Go JOM manipulation functions such as...
+  - Traversing the JOM
+    - Getting and setting (currently only able to be done through `JsonPathSelector`/`JsonPathSetter` or `GetAbsolutePaths`/`SetAbsolutePaths` or through the map accessed via `GetInsides`)
+  - Appending to lists
+  - Deletion
+- Needed performance and bug fixes
