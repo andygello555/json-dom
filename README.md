@@ -9,6 +9,7 @@ Embedded JSON manipulation using [Hjson](https://hjson.github.io/) and Go
   - [Example usage](#example-usage)
   - [Scope](#scope)
   - [Order execution](#order-execution)
+  - [Native Go JOM manipulation](#native-go-jom-manipulation)
 - [Available languages](#available-languages)
   - [Shebangs](#shebangs)
   - [Javascript](#javascript)
@@ -276,6 +277,22 @@ The only two rules:
 - If there are multiple scripts on the same level of the scope then scripts will be run in **lexicographical script-key
 order**.
 
+### Native Go JOM manipulation
+
+The following referrer functions are available for native Go JOM manipulation via the `json_map.JsonMapInt` interface:
+- `Clone(clear bool) JsonMapInt`: Return a clone of the JsonMap. If clear is given then New will be called but `Array` field will be inherited.
+- `GetInsides() *map[string]interface{}`: Getter for `insides`. Could be traversed but its easier using the below functions.
+- `GetAbsolutePaths(absolutePaths *AbsolutePaths) (values []*JsonPathNode, errs []error)`: Given the list of absolute paths for a `jom.JsonMap`, will return the list of values that said paths lead to.
+- `SetAbsolutePaths(absolutePaths *AbsolutePaths, value interface{}) (err error)`: Given the list of absolute paths for a `jom.JsonMap`: will set the values pointed to by the given JSON path to be the given value. If `nil` is given as the value then the pointed to elements will be deleted.
+- `JsonPathSelector(jsonPath string) (out []*JsonPathNode, err error)`: Given a valid JSON path will return the list of pointers to `json_map.JsonPathNode`(s) that satisfies the JSON path.
+- `JsonPathSetter(jsonPath string, value interface{}) (err error)`: Given a valid JSON path: will set the values pointed to by the JSON path to be the value given. If `nil` is given as the value then the pointed to elements will be deleted.
+- `MustGet(jsonPath string) (out []interface{})`: Like `jom.JsonPathSelector`, only it panics when an error occurs and returns an `[]interface{}` instead of `[]json_map.JsonPathNode`.
+- `MustSet(jsonPath string, value interface{})`: Like `jom.JsonPathSetter`, only it panics when an error occurs.
+- `MustDelete(jsonPath string)`: A wrapper for `MustSet(jsonPath, nil)`
+- `MustPush(jsonPath string, value interface{}, indices... int)`: Pushes to an `[]interface{}` indicated by the given JSON path at the given indices and panics if any errors occur.
+- `MustPop(jsonPath string, indices... int) (popped []interface{})`: Pops from an `[]interface{}` indicated by the given JSON path at the given indices and panics if any errors occur.
+- `Strip()`: Strips any script key-value pairs found within the `jom.JsonMap` and updates it in place.
+
 ## Available languages
 
 ### Shebangs
@@ -388,12 +405,10 @@ Check out [`assets/tests/examples`](assets/tests/examples) for some more example
 
 ## Future
 
-- More supported languages via bindings/interpreters/VMs however
+- More supported languages via bindings/interpreters/VMs
   - Python
   - Lua
 - Some better native Go JOM manipulation functions such as...
   - Traversing the JOM
     - Getting and setting (currently only able to be done through `JsonPathSelector`/`JsonPathSetter` or `GetAbsolutePaths`/`SetAbsolutePaths` or through the map accessed via `GetInsides`)
-  - Appending to lists
-  - Deletion
 - Needed performance and bug fixes

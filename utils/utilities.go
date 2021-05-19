@@ -70,11 +70,64 @@ func Range(start, end, step int) []int {
 	return s
 }
 
+func Max(x, y int) int {
+	if x < y {
+		return y
+	}
+	return x
+}
+
+// Remove duplicates and sort an array of integers in place
+func RemoveDuplicatesAndSort(indices *[]int) {
+	actualIndices := make([]int, 0)
+	indexSet := make(map[int]struct{})
+
+	for _, index := range *indices {
+		// Check if the index is already in the array of actual indices. If not then we can add it
+		if _, exists := indexSet[index]; !exists {
+			actualIndices = append(actualIndices, index)
+			indexSet[index] = struct{}{}
+		}
+	}
+
+	// Sort the indices
+	sort.Ints(actualIndices)
+	*indices = actualIndices
+}
+
+func AddElems(slice []interface{}, value interface{}, indices... int) []interface{} {
+	RemoveDuplicatesAndSort(&indices)
+	// Find the bounds of the new array which will contain the appended value
+	high := Max(indices[len(indices) - 1] + 1, len(slice))
+	// Construct a new array from the specifications above
+	newArr := make([]interface{}, high)
+	offset := 0
+
+	var currIdx int
+	currIdx, indices = indices[0], indices[1:]
+
+	// Iterate from 0 to high inserting a value at each index to insert into
+	for i := 0; i < high; i++ {
+		if currIdx == i {
+			if len(indices) > 0 {
+				currIdx, indices = indices[0], indices[1:]
+			}
+			newArr[i] = value
+			offset += 1
+			continue
+		}
+		if i - offset < len(slice) {
+			newArr[i] = slice[i - offset]
+		}
+	}
+	return newArr
+}
+
 // Removes the elements at the given indices in the given interface slice and returns a new slice.
 func RemoveElems(slice []interface{}, indices... int) []interface{} {
+	RemoveDuplicatesAndSort(&indices)
 	out := make([]interface{}, 0)
 	// Simple priority queue structure
-	sort.Ints(indices)
 	var currIdx int
 	currIdx, indices = indices[0], indices[1:]
 

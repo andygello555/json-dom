@@ -67,7 +67,7 @@ func NewFromMap(jsonMap map[string]interface{}) *JsonMap {
 	}
 }
 
-// Return a clone of the JsonMap. If clear is given then a New will be called and returned.
+// Return a clone of the JsonMap. If clear is given then New will be called but "Array" field will be inherited.
 // NOTE this is primarily used when using json_map.JsonMapInt to return a new JsonMap to avoid cyclic imports
 func (jsonMap *JsonMap) Clone(clear bool) json_map.JsonMapInt {
 	if !clear {
@@ -1027,7 +1027,7 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 	return err
 }
 
-// Given a valid JSON path will return the list of pointers to json_map.JsonPathNode(s) that satisfy the JSON path.
+// Given a valid JSON path will return the list of pointers to json_map.JsonPathNode(s) that satisfies the JSON path.
 // Essentially just a wrapper for utils.ParseJsonPath and GetAbsolutePaths
 //
 // This function supports the following JSON path syntax
@@ -1083,31 +1083,6 @@ func (jsonMap *JsonMap) MarkupCode(jsonPath string, shebangName string, script s
 	// Run JsonPathSetter
 	err = jsonMap.JsonPathSetter(jsonPath, constructedScript)
 	return err
-}
-
-// Check if the given string contains a json-dom script.
-// This is done by checking the first line of the string and seeing if it starts with the ShebangPrefix and ends with
-// one of the supported languages.
-// Panics if the shebang fits the required length for a shebang but is not a supported script language.
-// Returns true if the script does contain a json-dom script, false otherwise. Along with the retrieved script language.
-func CheckIfScript(script string) (isScript bool, shebangScriptLang string) {
-	firstLine := strings.Split(script, "\n")[0]
-	firstLen := len(firstLine)
-
-	// First check the bounds of the line so that we won't panic
-	if firstLen >= utils.ShebangLen + utils.ShortestSupportedScriptTagLen && firstLen <= utils.ShebangLen + utils.LongestSupportedScriptTagLen {
-		shebangPrefix, shebangScriptLang := firstLine[:utils.ShebangLen], firstLine[utils.ShebangLen:]
-		if shebangPrefix != utils.ShebangPrefix {
-			return false, shebangScriptLang
-		}
-		if !code.CheckIfSupported(shebangScriptLang) {
-			// We are going to panic here as the script is unsupported
-			// NOTE this will only panic when the shebang script is between the shorted and the longest supported lengths
-			panic(utils.UnsupportedScriptLang.FillError(shebangScriptLang, fmt.Sprintf(utils.ScriptErrorFormatString, utils.AnonymousScriptPath, script)))
-		}
-		return true, shebangScriptLang
-	}
-	return false, shebangScriptLang
 }
 
 // Finds all the script and non-script fields within a JsonMap.
@@ -1354,6 +1329,99 @@ func Eval(jsonBytes []byte, verbose bool) (out []byte, err error) {
 		return out, err
 	}
 	return out, nil
+}
+
+// Like JsonPathSelector, only it panics when an error occurs and returns an []interface{} instead of []json_map.JsonPathNode
+// The type of out depends on how many results were returned:
+// - If no == 0 then out == nil
+// - If no > 0 then out == []interface{}
+func (jsonMap *JsonMap) MustGet(jsonPath string) (out []interface{}) {
+	selector, err := jsonMap.JsonPathSelector(jsonPath)
+	if err != nil {
+		panic(err)
+	}
+	if len(selector) == 0 {
+		out = nil
+	} else {
+		out = make([]interface{}, len(selector))
+		for i, v := range selector {
+			out[i] = v.Value
+		}
+	}
+	return out
+}
+
+// Like JsonPathSetter, only it panics when an error occurs
+func (jsonMap *JsonMap) MustSet(jsonPath string, value interface{}) {
+	err := jsonMap.JsonPathSetter(jsonPath, value)
+	if err != nil {
+		panic(err)
+	}
+}
+
+// A wrapper for MustSet(jsonPath, nil)
+func (jsonMap JsonMap) MustDelete(jsonPath string) {
+	jsonMap.MustSet(jsonPath, nil)
+}
+
+// Pushes to an []interface{} indicated by the given JSON path at the given indices and panics if any errors occur.
+// NOTE: this assumes that the JSON path points to an array and will use JsonPathSetter to set the JSON path to be the array selected + the pushed values
+// Indices conditions:
+// - If no indices are given insert value at the end of the array (len(arr))
+// - If duplicates occur then they will be ignored/removed
+// - Can be unsorted (will be sorted within function)
+// - If a given index is greater than the length of the array to insert to, all empty spaces will be filled with nil
+func (jsonMap *JsonMap) MustPush(jsonPath string, value interface{}, indices... int) {
+	nodes := jsonMap.MustGet(jsonPath)
+	if nodes == nil {
+		panic(errors.New(fmt.Sprintf("no node at \"%s\" to push to", jsonPath)))
+	}
+
+	// Use the AddElems utility to add the value at the given indices
+	if len(indices) == 0 {
+		indices = append(indices, len(nodes))
+	}
+	newArr := utils.AddElems(nodes, value, indices...)
+
+	// Finally we set the same path we are given to be the newArr
+	jsonMap.MustSet(jsonPath, newArr)
+}
+
+// Pops from an []interface{} indicated by the given JSON path at the given indices and panics if any errors occur.
+// NOTE: this assumes that the JSON path points to an array and will use JsonPathSetter to set the JSON path to be the array selected + the pushed values
+// Indices conditions:
+// - If no indices are given delete value at the start of the array
+// - If duplicates occur then they will be ignored/removed
+// - Can be unsorted (will be sorted within function)
+// - Indices that are not within the range of the array will be ignored
+func (jsonMap *JsonMap) MustPop(jsonPath string, indices... int) (popped []interface{}) {
+	nodes := jsonMap.MustGet(jsonPath)
+	if nodes == nil {
+		panic(errors.New(fmt.Sprintf("no node at \"%s\" to pop from", jsonPath)))
+	}
+
+	// We get the popped elements and the new array at the some time
+	utils.RemoveDuplicatesAndSort(&indices)
+	popped = make([]interface{}, 0)
+	newArr := make([]interface{}, 0)
+
+	var currIdx int
+	currIdx, indices = indices[0], indices[1:]
+
+	for i, node := range nodes {
+		if currIdx == i {
+			popped = append(popped, node)
+			if len(indices) > 0 {
+				currIdx, indices = indices[0], indices[1:]
+			}
+			continue
+		}
+		newArr = append(newArr, node)
+	}
+
+	// Then we use MustSet to set the new array
+	jsonMap.MustSet(jsonPath, newArr)
+	return popped
 }
 
 // Marshals the JsonMap into hjson and returns the stringified byte array
