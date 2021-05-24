@@ -1,3 +1,6 @@
+// Contains runner for native Go callbacks within JOM.
+//
+// This is a fairly stripped down version of a script package due to there not being any VM to get and set values from/to.
 package _go
 
 import (
@@ -8,10 +11,25 @@ import (
 	"time"
 )
 
+// Registers "go" as a supported language.
 func init() {
 	code.RegisterLang("go", RunCallback)
 }
 
+// Runs a Go callback.
+//
+// Callback must have the signature:
+//  func(json json_map.JsonMapInt)
+// Otherwise RunCallback will panic.
+//
+// Halting Problem
+//
+// The given callback within code will be wrapped in a goroutine which will push an interrupt once the callback has finished.
+// If the callback doesn't finish within utils.HaltingDelay seconds a separate goroutine will push the interrupt which
+// will cause RunCallback to return early.
+//
+// Note: If a halting problem issue occurs then there will be a goroutine running the callback until it has finished, which may be never.
+// Keep this in mind if you have a long running program which utilises native Go callback execution.
 func RunCallback(code code.Code, jsonMap json_map.JsonMapInt) (data json_map.JsonMapInt, err error) {
 	// Get the callback from the code object
 	callback := code.Script.(func(json json_map.JsonMapInt))

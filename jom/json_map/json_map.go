@@ -1,132 +1,47 @@
+// Contains the JsonMapInt interface which should be used in signatures as well as constants and types relating to
+// AbsolutePaths and JSON path parsing to AbsolutePaths.
 package json_map
 
-import "fmt"
-
-// Represents a type of a key within an AbsolutePath
-type AbsolutePathKeyType int
-
-// All the key types that can be added to an absolute path
-const (
-	StringKey       AbsolutePathKeyType = iota
-	IndexKey        AbsolutePathKeyType = iota
-	Wildcard        AbsolutePathKeyType = iota
-	Filter          AbsolutePathKeyType = iota
-	First           AbsolutePathKeyType = iota
-	Slice           AbsolutePathKeyType = iota
-	// NOTE the following should only be used within a Slice AbsolutePathKey's Value
-	StartEnd        AbsolutePathKeyType = iota
-	RecursiveLookup AbsolutePathKeyType = iota
-)
-
-// Map of absolute key type values to their corresponding names
-// Used in String method of AbsolutePathKey
-var AbsolutePathKeyTypeNames = map[AbsolutePathKeyType]string {
-	StringKey:       "StringKey",
-	IndexKey:        "IndexKey",
-	Wildcard:        "Wildcard",
-	Filter:          "Filter",
-	First:           "First",
-	Slice:           "Slice",
-	StartEnd:        "StartEnd",
-	RecursiveLookup: "RecursiveLookup",
-}
-
-// An absolute path key with a KeyType and a Value
-type AbsolutePathKey struct {
-	KeyType AbsolutePathKeyType
-	Value   interface{}
-}
-
-func (apk AbsolutePathKey) String() string {
-	return fmt.Sprintf("|%s: %v|", AbsolutePathKeyTypeNames[apk.KeyType], apk.Value)
-}
-
-// Type representing a list of absolute paths
-// Used as an intermediary for calculating JSON paths
-type AbsolutePaths [][]AbsolutePathKey
-
-// Adds the given value to the end of each absolute path in the AbsolutePaths list.
-// If check is true then the given jsonMap will be checked if all paths can be reached within the context of the map.
-// jsonMap can be nil if check is false.
-func (p *AbsolutePaths) AddToAll(jsonMap JsonMapInt, check bool, pathValues... AbsolutePathKey) (errs []error) {
-	if len(*p) > 0 {
-		// If our AbsolutePaths array contains the following paths...
-		// {property1, 0}
-		// {property1, 1}
-		// And we want to add the new paths: [0, 1, 2]
-		// Then we would end up with...
-		// {property1, 0, 0}
-		// {property1, 0, 1}
-		// {property1, 0, 2}
-		// {property1, 1, 0}
-		// {property1, 1, 1}
-		// {property1, 1, 2}
-		if len(pathValues) > 1 {
-			newAbsolutePaths := make(AbsolutePaths, 0)
-			for _, absolutePath := range *p {
-				for _, val := range pathValues {
-					// Create a clone of the absolute path slice
-					newAbsolutePath := make([]AbsolutePathKey, len(absolutePath))
-					copy(newAbsolutePath, absolutePath)
-					// Append the value onto the new absolute path slice
-					newAbsolutePath = append(newAbsolutePath, val)
-					// Then append the new path into the new array
-					newAbsolutePaths = append(newAbsolutePaths, newAbsolutePath)
-				}
-			}
-			// Set the current referer to equal the new paths
-			*p = newAbsolutePaths
-		} else if len(pathValues) == 1 {
-			// Do this to save memory as no new absolute paths are created therefore no paths need to be cloned
-			for i, absolutePath := range *p {
-				(*p)[i] = append(absolutePath, pathValues[0])
-			}
-		}
-	} else {
-		// Create the start of the absolute paths
-		for _, val := range pathValues {
-			*p = append(*p, []AbsolutePathKey{val})
-		}
-	}
-
-	// Check if there is a way to all of those paths (only if any new paths were added and check is true)
-	if len(pathValues) > 0 && check {
-		_, errs = jsonMap.GetAbsolutePaths(p)
-		if errs != nil {
-			return errs
-		}
-	}
-	return nil
-}
-
-// Stores a node within a JsonMapInt
-type JsonPathNode struct {
-	// The absolute JSON path to the node
-	Absolute []AbsolutePathKey
-	// The value of the node
-	Value    interface{}
-}
-
 // Acts as an interface for jom.JsonMap.
-// Primarily created to stop cyclic imports
+//
+// Primarily created to stop cyclic imports.
 type JsonMapInt interface {
+	// Return a clone of the JsonMap. If clear is given then New will be called but "Array" field will be inherited.
 	Clone(clear bool) JsonMapInt
+	// Finds all the script and non-script fields within a JsonMap.
 	FindScriptFields() (found bool)
+	// Returns the current scopes JSON Path to itself.
 	GetCurrentScopePath() string
+	// Getter for insides.
 	GetInsides() *map[string]interface{}
+	// Given the list of absolute paths for a JsonMap, will return the list of values that said paths lead to.
 	GetAbsolutePaths(absolutePaths *AbsolutePaths) (values []*JsonPathNode, errs []error)
+	// Given a valid JSON path will return the list of pointers to json_map.JsonPathNode(s) that satisfies the JSON path.
 	JsonPathSelector(jsonPath string) (out []*JsonPathNode, err error)
+	// Given a valid JSON path: will set the values pointed to by the JSON path to be the value given.
 	JsonPathSetter(jsonPath string, value interface{}) (err error)
+	// Adds the given script of the given shebangName (must be a supported language) at the path pointed to by the given jsonPath.
 	MarkupCode(jsonPath string, shebangName string, script string) (err error)
+	// Marshal a JsonMap back into JSON.
 	Marshal() (out []byte, err error)
+	// A wrapper for MustSet(jsonPath, nil).
 	MustDelete(jsonPath string)
+	// Like JsonPathSelector, only it panics when an error occurs and returns an []interface{} instead of []json_map.JsonPathNode.
 	MustGet(jsonPath string) (out []interface{})
+	// Pops from an []interface{} indicated by the given JSON path at the given indices and panics if any errors occur.
 	MustPop(jsonPath string, indices... int) (popped []interface{})
+	// Pushes to an []interface{} indicated by the given JSON path at the given indices and panics if any errors occur.
 	MustPush(jsonPath string, value interface{}, indices... int)
+	// Like JsonPathSetter, only it panics when an error occurs.
 	MustSet(jsonPath string, value interface{})
+	// Given a JsonMap this will traverse it and execute all scripts. Will update the given JsonMap in place.
 	Run()
+	// Given the list of absolute paths for a JsonMap: will set the values pointed to by the given JSON path to be the given value.
 	SetAbsolutePaths(absolutePaths *AbsolutePaths, value interface{}) (err error)
+	// Strips any script key-value pairs found within the JsonMap and updates it in place.
 	Strip()
+	// Marshals the JsonMap into hjson and returns the stringified byte array.
 	String() string
+	// Unmarshal a hjson byte string and package it as a JsonMap.
 	Unmarshal(jsonBytes []byte) (err error)
 }

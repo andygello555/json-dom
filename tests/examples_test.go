@@ -1,3 +1,18 @@
+// Stores tests.
+//
+// Example test
+//
+// Located in:
+//  example_test.go
+// Evaluates all examples in...
+//  ../assets/tests/examples/
+// ... In every supported language and compares it to the example's respective expected output which are stored in:
+//  ../assets/tests/example_out/
+//
+// JSON path test
+//
+// Tests a series of defined JSON paths and json_map.AbsolutePaths using JsonPathSelector/JsonPathSetter and
+// GetAbsolutePaths/SetAbsolutePaths.
 package tests
 
 import (

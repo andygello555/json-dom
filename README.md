@@ -16,6 +16,7 @@ Embedded JSON manipulation using [Hjson](https://hjson.github.io/) and Go
     - [Builtin functions](#builtin-functions)
     - [Builtin symbols](#builtin-symbols)
   - [Go](#go)
+    - [Incompatibility within JOMs containing multiple languages](#incompatibility-within-joms-containing-multiple-languages)
     - [Example](#example)
     - [Caveats](#caveats)
 - [JSON path notes](#json-path-notes)
@@ -347,6 +348,12 @@ Scripts are run using the [otto](https://pkg.go.dev/github.com/robertkrimen/otto
 
 Scripts can be written in native Go using function callbacks. Functions can only be added to the JOM using the `JsonPathSetter` and `SetAbsolutePaths` referrer functions available for `JsonMap`. Added functions must have the signature: `func(json_map.JsonMapInt)` for them to be called by `jom.Eval`/`jom.Run`.
 
+#### Incompatibility within JOMs containing multiple languages
+
+Due to the way the `json` object is serialised in script based supported languages Go native callbacks **cannot be used in a JOM that also contains script strings.** Support for this might be added but it is worth keeping in mind.<br/>
+
+The only way around this at the moment is to `Run` or `Eval` the hjson before marking it up with any native Go callbacks.
+
 #### Example
 
 If you had a `jom.JsonMap` containing the following JSON...
@@ -362,11 +369,11 @@ You could then use `JsonPathSetter` or `SetAbsolutePaths` to insert a native Go 
 ```go
 // This is the function that will be run in the scope
 callback := func(json json_map.JsonMapInt) {
-  name, _ := json.JsonPathSelector("$.name")
-  firstLast := strings.Split(name[0].Value.(string), " ")
-  _ = json.JsonPathSetter("$.first_name", firstLast[0])
-  _ = json.JsonPathSetter("$.last_name", firstLast[1])
-  _ = json.JsonPathSetter("$.name", nil)
+    name := json.MustGet("$.name")[0].(string)
+    firstLast := strings.Split(name, " ")
+    json.MustSet("$.first_name", firstLast[0])
+    json.MustSet("$.last_name", firstLast[1])
+    json.MustDelete("$.name")
 }
 
 // If your JsonMap was in a variable named "jsonMap"
@@ -410,5 +417,5 @@ Check out [`assets/tests/examples`](assets/tests/examples) for some more example
   - Lua
 - Some better native Go JOM manipulation functions such as...
   - Traversing the JOM
-    - Getting and setting (currently only able to be done through `JsonPathSelector`/`JsonPathSetter` or `GetAbsolutePaths`/`SetAbsolutePaths` or through the map accessed via `GetInsides`)
+- Running native Go callbacks as well as embedded scripts all in one Go. Cannot be done at the moment due to [this](#incompatibility-within-joms-containing-multiple-languages) issue.
 - Needed performance and bug fixes

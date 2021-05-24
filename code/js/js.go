@@ -1,10 +1,12 @@
+// Contains runner and getter/setter functions for the execution of JS scripts within an otto.Otto VM.
+//
+// Any additional supported languages should follow the rough structure of this package.
 package js
 
 import (
 	"encoding/json"
 	"fmt"
 	"github.com/andygello555/json-dom/code"
-	"github.com/andygello555/json-dom/jom"
 	"github.com/andygello555/json-dom/jom/json_map"
 	"github.com/andygello555/json-dom/utils"
 	"github.com/robertkrimen/otto"
@@ -15,16 +17,20 @@ import (
 	"time"
 )
 
-// Register this language in the code package
+// Register this language in the code package.
 func init() {
 	code.RegisterLang("js", RunScript)
 }
 
-// These can be set when testing to check output
-var ExternalConsoleLogStdout io.Writer = os.Stdout
-var ExternalConsoleLogStderr io.Writer = os.Stderr
+// These can be set when testing to check output.
+var (
+	ExternalConsoleLogStdout io.Writer = os.Stdout
+	ExternalConsoleLogStderr io.Writer = os.Stderr
+)
 
-// Used to map a JS Object from Otto into a map so that it can be used
+var toBeCloned json_map.JsonMapInt
+
+// Used to map a JS Object from Otto into a map so that it can be used.
 func traverseObject(object *otto.Object) *map[string]interface{} {
 	objectMap := make(map[string]interface{})
 
@@ -93,7 +99,7 @@ func toGo(value otto.Value) (out interface{}) {
 	return out
 }
 
-// Composes a string to print from the given otto.FunctionCall
+// Composes a string to print from the given otto.FunctionCall.
 func composePrint(call otto.FunctionCall) *strings.Builder {
 	// Print the caller location
 	var out strings.Builder
@@ -136,10 +142,13 @@ func composePrint(call otto.FunctionCall) *strings.Builder {
 // Given a JSON path will return a "NodeSet" object which contains the absolute paths to all values denoted by the JSON
 // path as well as getter and setter functions.
 //
-// 1. Function will stringify json.trail within the VM and unmarshall to a new JsonMap.
-// 2. The JSON path will be parsed into json_map.AbsolutePaths and GetAbsolutePaths will be called
-// 3. json_map.AbsolutePaths will be converted into JS values
-// 4. The returned object will be constructed (_absolutePaths, getValues, setValues)
+// • Function will stringify json.trail within the VM and unmarshall to a new JsonMap.
+//
+// • The JSON path will be parsed into json_map.AbsolutePaths and GetAbsolutePaths will be called.
+//
+// • json_map.AbsolutePaths will be converted into JS values.
+//
+// • The returned object will be constructed (_absolutePaths, getValues, setValues).
 func jsonPathSelector(call otto.FunctionCall) otto.Value {
 	var err error
 	vm := call.Otto
@@ -155,7 +164,7 @@ func jsonPathSelector(call otto.FunctionCall) otto.Value {
 	jsonPath, _ := call.Argument(0).ToString()
 
 	// We set up a function to retrieve the JsonMap so we can retrieve the most up to date version of json.trail
-	getJsonMap := func(vm *otto.Otto) *jom.JsonMap {
+	getJsonMap := func(vm *otto.Otto) json_map.JsonMapInt {
 		// Stringify the json.trail object
 		var trailStringValue otto.Value
 		trailStringValue, err = vm.Run(fmt.Sprintf("JSON.stringify(%s.trail)", utils.JOMVariableName))
@@ -167,7 +176,7 @@ func jsonPathSelector(call otto.FunctionCall) otto.Value {
 		}
 		// Marshall the JSON string into a JsonMap
 		trailString, _ := trailStringValue.ToString()
-		jMap := jom.New()
+		jMap := toBeCloned.Clone(true)
 		err = jMap.Unmarshal([]byte(trailString))
 		if err != nil {
 			throw(fmt.Sprintf("cannot Unmarshall \"%s\" into a JsonMap", trailString))
@@ -176,7 +185,7 @@ func jsonPathSelector(call otto.FunctionCall) otto.Value {
 	}
 
 	// Another temp function to get the absolute path values from the given JsonMap
-	getAbsPaths := func(absolutePaths *json_map.AbsolutePaths, jMap *jom.JsonMap) []*json_map.JsonPathNode {
+	getAbsPaths := func(absolutePaths *json_map.AbsolutePaths, jMap json_map.JsonMapInt) []*json_map.JsonPathNode {
 		values, errs := jMap.GetAbsolutePaths(absolutePaths)
 		if errs != nil {
 			throw(utils.JsonPathError.FillFromErrors(errs).Error())
@@ -186,7 +195,7 @@ func jsonPathSelector(call otto.FunctionCall) otto.Value {
 
 	// Then we will parse the JSON path
 	var absolutePaths json_map.AbsolutePaths
-	absolutePaths, err = utils.ParseJsonPath(jsonPath)
+	absolutePaths, err = json_map.ParseJsonPath(jsonPath)
 	if err != nil {
 		throw(err.Error())
 	}
@@ -298,7 +307,7 @@ func jsonPathSelector(call otto.FunctionCall) otto.Value {
 		}
 
 		// Then we call SetAbsolutePaths
-		// NOTE: this is referencing the absolute paths from outside the scope of this function but this doesn't matter
+		// NOTE: This is referencing the absolute paths from outside the scope of this function but this doesn't matter
 		//       because if the user has changed the JSON structure for the worse then its kinda their fault for using
 		//       an out of date NodeSet object
 		err = jsonMap.SetAbsolutePaths(&absolutePaths, valueGo)
@@ -316,7 +325,7 @@ func jsonPathSelector(call otto.FunctionCall) otto.Value {
 		_ = call.Otto.Set(utils.ModifiedTrailValueVarName, trail)
 		_, err = call.Otto.Run(fmt.Sprintf("json[\"trail\"] = %s", utils.ModifiedTrailValueVarName))
 		if err != nil {
-			throw(err.Error() + "gello")
+			throw(err.Error())
 		}
 		return otto.NullValue()
 	}
@@ -329,20 +338,11 @@ func jsonPathSelector(call otto.FunctionCall) otto.Value {
 	return nodeSet
 }
 
-// Struct representing a builtin function that can be called from within the JS environment
-type BuiltinFunc struct {
+// Construct a list of all the builtin functions to register when creating the environment.
+var builtinFuncs = []struct{
 	name     string
-	function func(call otto.FunctionCall)otto.Value
-}
-
-// Struct representing a variable that can be accessed from within the JS environment
-type BuiltinVar struct {
-	name   string
-	getter func(...interface{}) interface{}
-}
-
-// Construct a list of all the builtin functions to register when creating the environment
-var builtinFuncs = []BuiltinFunc{
+	function func(call otto.FunctionCall) otto.Value
+}{
 	// printlnExternal is a legacy version of the console.log
 	{"printlnExternal", func(call otto.FunctionCall) otto.Value {
 		_, _ = fmt.Fprintf(ExternalConsoleLogStdout, "Print %s", composePrint(call))
@@ -350,14 +350,17 @@ var builtinFuncs = []BuiltinFunc{
 	}},
 }
 
-var builtinVars = []BuiltinVar{
+var builtinVars = []struct{
+	name   string
+	getter func(...interface{}) interface{}
+}{
 	// Construct the main JOM object
 	{utils.JOMVariableName, func(i ...interface{}) interface{} {
 		runtime := i[0].(*otto.Otto)
 		jsonMap := i[1].(json_map.JsonMapInt)
 		trail, err := createJom(jsonMap)
 		if err != nil {
-			panic(utils.BuiltinGetterError.FillError("json.trail", "Could not JOM-ify"))
+			panic(utils.BuiltinGetterError.FillError("json.trail", "Could not JOM-ify", err.Error()))
 		}
 		jom := map[string]interface{} {
 			"trail": trail,
@@ -393,13 +396,15 @@ var builtinVars = []BuiltinVar{
 }
 
 // Create the JOM within a Javascript VM, assign all necessary functions and retrieve the variable from within the VM.
+//
 // This will create a JOM for the scope of the given json map.
-// NOTE this needs to be used to correctly parse Go arrays ([]interface{}) as JS arrays and not JS objects
-// Returns an otto.Value which can be plugged into the VM which will run the scripts. If an error occurs at any point
+// Note: This needs to be used to correctly parse Go arrays ([]interface{}) as JS arrays and not JS objects.
+// Returns an otto.Value which can be plugged into the VM which will run the scripts. If an error occurs at any point.
 // then an otto.NullValue and the error are returned.
 func createJom(jsonMap json_map.JsonMapInt) (run otto.Value, err error) {
 	// Convert the map to json
-	jsonDataBytes, err := json.Marshal(jsonMap.GetInsides())
+	var jsonDataBytes []byte
+	jsonDataBytes, err = json.Marshal(jsonMap.GetInsides())
 	if err != nil {
 		return otto.NullValue(), err
 	}
@@ -420,8 +425,9 @@ func createJom(jsonMap json_map.JsonMapInt) (run otto.Value, err error) {
 	return run, nil
 }
 
-// Given a JS environment, retrieve the JOM and generate the json_map.JsonMapInt for the object
-// Returns the json_map.JsonMapInt of the converted JOM and any errors (if there are any)
+// Given a JS environment, retrieve the JOM and generate the json_map.JsonMapInt for the object.
+//
+// Returns the json_map.JsonMapInt of the converted JOM and any errors (if there are any).
 func deJomIfy(jsonMap json_map.JsonMapInt, env *otto.Otto) (data json_map.JsonMapInt, err error) {
 	// TODO this will need to change when the CreateJom function changes. Such as when new helper functions are introduced
 	data = jsonMap.Clone(true)
@@ -440,16 +446,25 @@ func deJomIfy(jsonMap json_map.JsonMapInt, env *otto.Otto) (data json_map.JsonMa
 	return data, nil
 }
 
-// Run the given script, with the given json_map.JsonMapInt and return the new json_map.JsonMapInt for the scope
-// The order of which things are executed
-// 1. The JOM is created
-// 2. The VM is created
-// 3. The builtins and the JOM is passed into the environment
-// 4. Interrupt for the halting problem is setup
-// 5. The script is run
-// 6. The environment is De-JOM-ified
-// 7. The new json_map.JsonMapInt is returned
+// Run the given script, with the given json_map.JsonMapInt and return the new json_map.JsonMapInt for the scope.
+//
+// Order of execution
+//
+// • The JOM is created.
+//
+// • The VM is created.
+//
+// • The builtins and the JOM is passed into the environment.
+//
+// • Interrupt for the halting problem is setup.
+//
+// • The script is run.
+//
+// • The environment is De-JOM-ified.
+//
+// • The new json_map.JsonMapInt is returned.
 func RunScript(code code.Code, jsonMap json_map.JsonMapInt) (data json_map.JsonMapInt, err error) {
+	toBeCloned = jsonMap
 	script := code.Script.(string)
 	// Create the VM and register all builtins
 	vm := otto.New()

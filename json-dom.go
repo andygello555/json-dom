@@ -1,3 +1,4 @@
+// The json-dom CLI application.
 package main
 
 import (
@@ -7,6 +8,7 @@ import (
 	_ "github.com/andygello555/json-dom/code/go"
 	_ "github.com/andygello555/json-dom/code/js"
 	"github.com/andygello555/json-dom/jom"
+	"github.com/andygello555/json-dom/jom/json_map"
 	"github.com/andygello555/json-dom/utils"
 	"io/ioutil"
 	"os"
@@ -69,7 +71,7 @@ func (jpscp *JsonPathScriptPair) Set(value string) error {
 		}
 
 		// Check if the json path given is valid
-		if _, err := utils.ParseJsonPath(jsonPathScriptArr[0]); err != nil {
+		if _, err := json_map.ParseJsonPath(jsonPathScriptArr[0]); err != nil {
 			return err
 		}
 

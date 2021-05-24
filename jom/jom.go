@@ -1,3 +1,7 @@
+// Implementation of json_map.JsonMapInt along with some other helper functions which relate to the JOM.
+//
+// JsonMap should not be used directly, json_map.JsonMapInt should be used instead for variable declaration, then jom.New,
+// Unmarshal, etc. for creating a JsonMap.
 package jom
 
 import (
@@ -18,14 +22,16 @@ import (
 	"time"
 )
 
-// Traversal object which is composed within JsonMap. Holds some info about the current traversal.
+// Holds some info about the current traversal of the JOM.
+//
+// Used when evaluating a JsonMap.
 type Traversal struct {
 	scopePath *strings.Builder
 	script    map[string]interface{}
 	nonScript map[string]interface{}
 }
 
-// Creates a new Traversal object (used within JsonMap)
+// Creates a new Traversal object (used within JsonMap).
 func newTraversal() *Traversal {
 	return &Traversal{
 		// The scopePath to the current scope of traversal (JSONPath)
@@ -37,7 +43,7 @@ func newTraversal() *Traversal {
 	}
 }
 
-// Wrapper for map[string]interface{} that can be easily extensible with more functionality
+// Wrapper for map[string]interface{} that can be easily extensible with more functionality.
 type JsonMap struct {
 	// The inner workings, aka. a map.
 	insides   map[string]interface{}
@@ -48,6 +54,7 @@ type JsonMap struct {
 }
 
 // Construct a new empty JsonMap.
+//
 // Returns a pointer to a JsonMap.
 func New() *JsonMap {
 	return &JsonMap{
@@ -57,8 +64,9 @@ func New() *JsonMap {
 	}
 }
 
-// Constructs a new JsonMap from the given string->interface{} map
-// Returns a pointer to a JsonMap
+// Constructs a new JsonMap from the given string->interface{} map.
+//
+// Returns a pointer to a JsonMap.
 func NewFromMap(jsonMap map[string]interface{}) *JsonMap {
 	return &JsonMap{
 		insides:   jsonMap,
@@ -68,7 +76,8 @@ func NewFromMap(jsonMap map[string]interface{}) *JsonMap {
 }
 
 // Return a clone of the JsonMap. If clear is given then New will be called but "Array" field will be inherited.
-// NOTE this is primarily used when using json_map.JsonMapInt to return a new JsonMap to avoid cyclic imports
+//
+// Note: This is primarily used when using json_map.JsonMapInt to return a new JsonMap to avoid cyclic imports.
 func (jsonMap *JsonMap) Clone(clear bool) json_map.JsonMapInt {
 	if !clear {
 		return &JsonMap{
@@ -83,7 +92,8 @@ func (jsonMap *JsonMap) Clone(clear bool) json_map.JsonMapInt {
 }
 
 // Returns the current scopes JSON Path to itself.
-// This just uses the string builder within the traversal field
+//
+// This just uses the string builder within the traversal field.
 func (jsonMap *JsonMap) GetCurrentScopePath() string {
 	return jsonMap.traversal.scopePath.String()
 }
@@ -96,7 +106,7 @@ func (jsonMap *JsonMap) GetInsides() *map[string]interface{} {
 
 // Evaluates the given JSON path filter expression on the given obj on the given json map. Returns a list of values of
 // all nodes which are satisfied by the given filter expression. Filter expressions are evaluated using the otto JS
-// interpreter so (pretty much) any valid javascript can be written within them **as long as they return a boolean**.
+// interpreter so (pretty much) any valid javascript can be written within them as long as they return a boolean value.
 // If the returnIndices flag is true then the function will return the slice of indices (string/int) where the true
 // values (as decided by the filter exp) occur.
 func filterRunner(obj interface{}, filterExp []byte, jsonMap map[string]interface{}, mapType bool, returnIndices bool) (truers interface{}, err error) {
@@ -335,6 +345,9 @@ func filterRunner(obj interface{}, filterExp []byte, jsonMap map[string]interfac
 	return truers, nil
 }
 
+// Run by GetAbsolutePaths in parallel for each absolute path in an json_map.AbsolutePaths array to find the requested values.
+//
+// Each found value is pushed to valChan and each error is pushed to errChan. Once it has complete it calls Done on the wait group.
 func pathFinder(path []json_map.AbsolutePathKey, jsonMap map[string]interface{}, errChan chan<- error, valChan chan<- json_map.JsonPathNode, wg *sync.WaitGroup) {
 	defer wg.Done()
 	var currValue interface{} = jsonMap
@@ -614,8 +627,9 @@ func pathFinder(path []json_map.AbsolutePathKey, jsonMap map[string]interface{},
 	}
 }
 
-// Given the list of absolute paths for a JsonMap, will return the list of values that said paths lead to
-// An absolute path is an array of strings, which represent map keys, and integers, which represent array indices.
+// Given the list of absolute paths for a JsonMap, will return the list of values that said paths lead to.
+//
+// An absolute path is an array of json_map.AbsolutePathKey(s), each of which represent a descent down the JsonMap.
 // Will start a goroutine for each absolute path slice in the given json_map.AbsolutePaths struct meaning that lookup
 // is pretty fast.
 func (jsonMap *JsonMap) GetAbsolutePaths(absolutePaths *json_map.AbsolutePaths) (values []*json_map.JsonPathNode, errs []error) {
@@ -680,7 +694,9 @@ func (jsonMap *JsonMap) GetAbsolutePaths(absolutePaths *json_map.AbsolutePaths) 
 }
 
 // Given the list of absolute paths for a JsonMap: will set the values pointed to by the given JSON path to be the
-// given value. If a value of nil is given the structures pointed to by the absolute paths will be deleted.
+// given value.
+//
+// If a value of nil is given the structures pointed to by the absolute paths will be deleted.
 // To avoid race conditions this routine runs single threaded which means this operation can be significantly slower
 // than getting values. It's important to bear this in mind.
 func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, value interface{}) (err error) {
@@ -1028,22 +1044,78 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 }
 
 // Given a valid JSON path will return the list of pointers to json_map.JsonPathNode(s) that satisfies the JSON path.
-// Essentially just a wrapper for utils.ParseJsonPath and GetAbsolutePaths
 //
-// This function supports the following JSON path syntax
-// - Property selection: .property BUT NOT ['property']
-// - Element selection: [n], [x, y, z]
-// - First descent: ...property (different to JSON path spec "...*" descends down the alphabetically first map/array)
-// - Recursive lookup: ..property (precedence over First descent - searches for all the properties of the given name)
-// - Wildcards: .property.*, [*]
-// - List slicing: [start:end], [start:], [-start:], [:end], [:-end]
-// - Filter expressions: [?(expression)]
-// - Current node syntax: @
+// A wrapper for utils.ParseJsonPath and GetAbsolutePaths.
+// Note: The JSON path syntax is very particular. If a JSON path is not being parsed make sure it looks like the below examples.
 //
-// If a filter expression can be evaluated in JS and returns a boolean value then it counts as a valid filter expression
+// This function supports the following JSON path syntax:
+//
+// Property selection
+//
+// Selects a property from a map.
+//  .property
+//  // BUT NOT
+//  ['property']
+//
+// Element selection
+//
+// Selects an element from an array. If a comma separated list is given this will give a new list of the elements at the
+// given indices.
+//  [n]
+//  // OR
+//  [x, y, z]
+//
+// First descent
+//
+// "...+" descends down the alphabetically first map/array. Any dots following "..." will indicate another first ascent.
+//  ...property
+// For example:
+//  .....property
+// Will perform first ascent three times.
+//
+// Recursive lookup
+//
+// Takes precedence over First descent. Searches for all the properties of the given name.
+//  ..property
+//
+// Wildcards
+//
+// Selects all values/elements from a map or an array respectively.
+//  // Key-values
+//  .property.*
+//  // Elements
+//  property[*]
+//
+// List slicing
+//
+// Slice a list from start to finish. Supports one missing side and negative indices. Similar to python list slicing.
+//  // From <start> to <end>
+//  [start:end]
+//  // From <start> to the end of the array
+//  [start:]
+//  // From the last <start> elements to the end of the array
+//  [-start:]
+//  // From the start of the array to <end> element
+//  [:end]
+//  // The entire array excluding the last <end> elements
+//  [:-end]
+//  // NOT SUPPORTED
+//  [:]
+//
+// Filter expressions
+//
+// A filter expression will be run against every value within a map and every element in an array. The resulting array
+// it will produce will be all the values on which the filter expression evaluated to true. Any JS expression which can
+// be processed by the Otto interpreter can be run as a filter expression. Therefore the expression must be a boolean
+// expression or one which can be cast to boolean using "!!".
+//  [?(expression)]
+// The current node can be referred to using the '@' character.
+//  $.property[?(@.name)]
+// Any JSON paths used within an expression will also be evaluated from the current scope.
+//  $.property[?($[0].name == @.name)]
 func (jsonMap *JsonMap) JsonPathSelector(jsonPath string) (out []*json_map.JsonPathNode, err error) {
 	out = make([]*json_map.JsonPathNode, 0)
-	paths, err := utils.ParseJsonPath(jsonPath)
+	paths, err := json_map.ParseJsonPath(jsonPath)
 	if err != nil {
 		return nil, err
 	}
@@ -1056,12 +1128,13 @@ func (jsonMap *JsonMap) JsonPathSelector(jsonPath string) (out []*json_map.JsonP
 	return values, nil
 }
 
-// Given a valid JSON path: will set the values pointed to by the JSON path to be the value given. If nil is given as
-// the value then the pointed to elements will be deleted.
-// Essentially just a wrapper for utils.ParseJsonPath -> SetAbsolutePaths
+// Given a valid JSON path: will set the values pointed to by the JSON path to be the value given.
+//
+// If nil is given as the value then the pointed to elements will be deleted.
+// A wrapper for utils.ParseJsonPath -> SetAbsolutePaths.
 func (jsonMap *JsonMap) JsonPathSetter(jsonPath string, value interface{}) (err error) {
 	var paths json_map.AbsolutePaths
-	paths, err = utils.ParseJsonPath(jsonPath)
+	paths, err = json_map.ParseJsonPath(jsonPath)
 	if err != nil {
 		return err
 	}
@@ -1071,6 +1144,7 @@ func (jsonMap *JsonMap) JsonPathSetter(jsonPath string, value interface{}) (err 
 
 // Adds the given script of the given shebangName (must be a supported language) at the path pointed to by the given
 // jsonPath.
+//
 // This just validates the given shebangName, constructs the script with the appropriate shebang and runs JsonPathSetter
 // on the given jsonPath with the constructed script as a value.
 func (jsonMap *JsonMap) MarkupCode(jsonPath string, shebangName string, script string) (err error)  {
@@ -1086,7 +1160,9 @@ func (jsonMap *JsonMap) MarkupCode(jsonPath string, shebangName string, script s
 }
 
 // Finds all the script and non-script fields within a JsonMap.
-// Updates the script and nonScript fields within the JsonMap's traversal object.
+//
+// Updates the script and nonScript fields within the JsonMap's traversal object. Scripts will be replaced by a code.Code
+// value which contains the runnable.
 func (jsonMap *JsonMap) FindScriptFields() (found bool) {
 	// Indicates whether a script tag has been found at the current depth or a nested depth. Used to indicate when to
 	// join a scriptFields subtree to its parent tree.
@@ -1160,6 +1236,7 @@ func (jsonMap *JsonMap) FindScriptFields() (found bool) {
 }
 
 // Strips any script key-value pairs found within the JsonMap and updates it in place.
+//
 // This is essentially just a wrapper for FindScriptFields which just sets insides to be traversal.nonScript.
 func (jsonMap *JsonMap) Strip() {
 	if jsonMap.FindScriptFields() {
@@ -1168,8 +1245,10 @@ func (jsonMap *JsonMap) Strip() {
 }
 
 // Given a JsonMap this will traverse it and execute all scripts. Will update the given JsonMap in place.
-// - All scripts will be run and removed from the JsonMap
-// - In cases where there are more than one script tag on a level: scripts will be evaluated in lexicographical script-key order
+//
+// • All scripts will be run and removed from the JsonMap.
+//
+// • In cases where there are more than one script tag on a level: scripts will be evaluated in lexicographical script-key order.
 func (jsonMap *JsonMap) Run() {
 	// At every level of the json map
 	// 1. Create a script priority queue of all the script tags at that level
@@ -1294,6 +1373,7 @@ func (jsonMap *JsonMap) Marshal() (out []byte, err error) {
 }
 
 // Evaluates the scripts within a given hjson byte array.
+//
 // Should really only be called from within CLI main.
 // Returns the evaluated JSON as a byte array and nil if everything is good. Otherwise an empty byte array and an error
 // will be returned if an error occurs.
@@ -1331,10 +1411,13 @@ func Eval(jsonBytes []byte, verbose bool) (out []byte, err error) {
 	return out, nil
 }
 
-// Like JsonPathSelector, only it panics when an error occurs and returns an []interface{} instead of []json_map.JsonPathNode
+// Like JsonPathSelector, only it panics when an error occurs and returns an []interface{} instead of []json_map.JsonPathNode.
+//
 // The type of out depends on how many results were returned:
-// - If no == 0 then out == nil
-// - If no > 0 then out == []interface{}
+//
+// • If no == 0 then out == nil.
+//
+// • If no > 0 then out == []interface{}.
 func (jsonMap *JsonMap) MustGet(jsonPath string) (out []interface{}) {
 	selector, err := jsonMap.JsonPathSelector(jsonPath)
 	if err != nil {
@@ -1351,7 +1434,7 @@ func (jsonMap *JsonMap) MustGet(jsonPath string) (out []interface{}) {
 	return out
 }
 
-// Like JsonPathSetter, only it panics when an error occurs
+// Like JsonPathSetter, only it panics when an error occurs.
 func (jsonMap *JsonMap) MustSet(jsonPath string, value interface{}) {
 	err := jsonMap.JsonPathSetter(jsonPath, value)
 	if err != nil {
@@ -1359,28 +1442,35 @@ func (jsonMap *JsonMap) MustSet(jsonPath string, value interface{}) {
 	}
 }
 
-// A wrapper for MustSet(jsonPath, nil)
-func (jsonMap JsonMap) MustDelete(jsonPath string) {
+// A wrapper for MustSet(jsonPath, nil).
+func (jsonMap *JsonMap) MustDelete(jsonPath string) {
 	jsonMap.MustSet(jsonPath, nil)
 }
 
 // Pushes to an []interface{} indicated by the given JSON path at the given indices and panics if any errors occur.
-// NOTE: this assumes that the JSON path points to an array and will use JsonPathSetter to set the JSON path to be the array selected + the pushed values
+//
+// Note: This assumes that the JSON path points to an array and will use JsonPathSetter to set the JSON path to be the array selected + the pushed values.
+//
 // Indices conditions:
-// - If no indices are given insert value at the end of the array (len(arr))
-// - If duplicates occur then they will be ignored/removed
-// - Can be unsorted (will be sorted within function)
-// - If a given index is greater than the length of the array to insert to, all empty spaces will be filled with nil
+//
+// • If no indices are given insert value at the end of the array (len(arr)).
+//
+// • If duplicates occur then they will be ignored/removed.
+//
+// • Can be unsorted (will be sorted within function).
+//
+// • If a given index is greater than the length of the array to insert to, all empty spaces will be filled with nil.
 func (jsonMap *JsonMap) MustPush(jsonPath string, value interface{}, indices... int) {
 	nodes := jsonMap.MustGet(jsonPath)
 	if nodes == nil {
 		panic(errors.New(fmt.Sprintf("no node at \"%s\" to push to", jsonPath)))
 	}
 
-	// Use the AddElems utility to add the value at the given indices
+	// If there are no indices given push to the back of the array
 	if len(indices) == 0 {
 		indices = append(indices, len(nodes))
 	}
+	// Use the AddElems utility to add the value at the given indices
 	newArr := utils.AddElems(nodes, value, indices...)
 
 	// Finally we set the same path we are given to be the newArr
@@ -1388,16 +1478,27 @@ func (jsonMap *JsonMap) MustPush(jsonPath string, value interface{}, indices... 
 }
 
 // Pops from an []interface{} indicated by the given JSON path at the given indices and panics if any errors occur.
-// NOTE: this assumes that the JSON path points to an array and will use JsonPathSetter to set the JSON path to be the array selected + the pushed values
+//
+// NOTE: this assumes that the JSON path points to an array and will use JsonPathSetter to set the JSON path to be the array selected + the pushed values.
+//
 // Indices conditions:
-// - If no indices are given delete value at the start of the array
-// - If duplicates occur then they will be ignored/removed
-// - Can be unsorted (will be sorted within function)
-// - Indices that are not within the range of the array will be ignored
+//
+// • If no indices are given delete value at the start of the array.
+//
+// • If duplicates occur then they will be ignored/removed.
+//
+// • Can be unsorted (will be sorted within function).
+//
+// • Indices that are not within the range of the array will be ignored.
 func (jsonMap *JsonMap) MustPop(jsonPath string, indices... int) (popped []interface{}) {
 	nodes := jsonMap.MustGet(jsonPath)
 	if nodes == nil {
 		panic(errors.New(fmt.Sprintf("no node at \"%s\" to pop from", jsonPath)))
+	}
+
+	// If there are no indices given pop from the head of the array
+	if len(indices) == 0 {
+		indices = append(indices, 0)
 	}
 
 	// We get the popped elements and the new array at the some time
@@ -1424,7 +1525,7 @@ func (jsonMap *JsonMap) MustPop(jsonPath string, indices... int) (popped []inter
 	return popped
 }
 
-// Marshals the JsonMap into hjson and returns the stringified byte array
+// Marshals the JsonMap into hjson and returns the stringified byte array.
 func (jsonMap *JsonMap) String() string {
 	var err error
 	var out []byte

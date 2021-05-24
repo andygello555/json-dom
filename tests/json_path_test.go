@@ -51,7 +51,7 @@ var example *jom.JsonMap
 var exampleMap map[string]interface{}
 
 // Some example absolute paths to input into GetAbsolutePaths
-var exampleAbsolutePathInput = []json_map.AbsolutePaths {
+var exampleAbsolutePathInput = []json_map.AbsolutePaths{
 	{
 		{{json_map.StringKey, "over-forty"}},
 		{{json_map.StringKey, "person"}, {json_map.StringKey, "friends"}, {json_map.IndexKey, 0}},

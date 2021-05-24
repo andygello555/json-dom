@@ -1,3 +1,10 @@
+// Contains all the types/functions to do with running scripts/callbacks as well as a map of all the SupportedLang(s).
+//
+// How it works
+//
+// When calling json_map.JsonMapInt.FindScriptFields, each script/callback will be replaced by a value of Code type in
+// the jom.Traversal field within jom.JsonMap. The code.Run function can be used to execute a code.Code object of any
+// supported type.
 package code
 
 import (
@@ -9,22 +16,28 @@ import (
 
 type ScriptLangType int
 
+// Script language types which are used for printing errors/determining script language type.
+//
+// Note: This does not mean that all constants are supported by json-dom.
 const (
 	JS ScriptLangType = iota
 	GO ScriptLangType = iota
 )
 
+// Wrapper for any "runnable" script/callback.
 type Code struct {
+	// The script/callback which can be run in either a VM of the language's type/in Go if it is a callback.
 	Script 	   interface{}
+	// The script's language which determines what it will be run inside.
 	ScriptLang ScriptLangType
 }
 
-// Uses utils.ScriptErrorFormatString to return a string with both the script and the script language
+// Uses utils.ScriptErrorFormatString to return a string with both the script and the script language.
 func (code *Code) String() string {
 	return fmt.Sprintf(utils.ScriptErrorFormatString, code.ScriptLangShebang(), fmt.Sprintf("%v", code.Script))
 }
 
-// Gets all the shebang suffixes for the given ScriptLangType
+// Gets all the shebang suffixes for the given ScriptLangType.
 func (code *Code) ScriptLangShebang() string {
 	return map[ScriptLangType]string{
 		JS: "js",
@@ -32,7 +45,7 @@ func (code *Code) ScriptLangShebang() string {
 	}[code.ScriptLang]
 }
 
-// Gets the ScriptLangType of the given shebang suffix
+// Gets the ScriptLangType of the given shebang suffix.
 func ShebangScriptLang(shebang string) ScriptLangType {
 	return map[string]ScriptLangType{
 		"js": JS,
@@ -43,11 +56,15 @@ func ShebangScriptLang(shebang string) ScriptLangType {
 // Creates a new Code object from the given string source code (must include shebang) or a func(json json_map.JsonMapInt).
 // If the given value is not one of these an empty Code object will be returned and ok will be false.
 // If the given value is a string the following will happen:
-//	 - Checking the first line of the string and seeing if it starts with the ShebangPrefix and ends with one of the supported languages.
-//	 - Panics if the shebang fits the required length for a shebang but is not a supported script language.
-//	 - ok is true if the script does contain a json-dom script, false otherwise.
+//
+// • Checking the first line of the string and seeing if it starts with the ShebangPrefix and ends with one of the supported languages.
+//
+// • Panics if the shebang fits the required length for a shebang but is not a supported script language.
+//
+// • ok is true if the script does contain a json-dom script, false otherwise.
+//
 // If the given value is a func(json json_map.JsonMapInt) then there will be no checks as a function callback will be
-// run rather than a script in a virtual environment
+// run rather than a script in a virtual environment.
 func NewFrom(from interface{}) (code Code, ok bool) {
 	ok = false
 	switch from.(type) {

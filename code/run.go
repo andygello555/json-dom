@@ -6,17 +6,30 @@ import (
 	"github.com/andygello555/json-dom/utils"
 )
 
+// Describes a language which is supported (can be run) from within a JOM.
 type SupportedLang struct {
-	// The suffix of the shebang
+	// The suffix of the shebang.
 	shebangName string
-	// The function that will run the given script in the given scope
+	// The function that will run the given script in the given scope.
 	runCode     func(code Code, jsonMap json_map.JsonMapInt) (data json_map.JsonMapInt, err error)
 }
 
 // All the scripting languages currently supported.
 var supportedLangs = make(map[string]*SupportedLang)
+//var supportedLangs = map[string]*SupportedLang {
+//	"js": {
+//		shebangName: "js",
+//		runCode:     js.RunScript,
+//	},
+//	"go": {
+//		shebangName: "go",
+//		runCode:     _go.RunCallback,
+//	},
+//}
 
-// Checks if the given
+// Checks if the given script language suffix is a supported language.
+//
+// This just checks the supportedLangs variable.
 func CheckIfSupported(scriptLang string) bool {
 	_, ok := supportedLangs[scriptLang]
 	return ok

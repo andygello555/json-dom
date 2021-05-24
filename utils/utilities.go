@@ -1,3 +1,4 @@
+// Contains errors, constants and other datastructures and helpful functions used throughout the codebase.
 package utils
 
 import (
@@ -8,8 +9,9 @@ import (
 	"testing"
 )
 
-// In-Out infinite channels that don't block when written to
-// This is from https://medium.com/capital-one-tech/building-an-unbounded-channel-in-go-789e175cd2cd
+// In-Out infinite channels that don't block when written to.
+//
+// This is from https://medium.com/capital-one-tech/building-an-unbounded-channel-in-go-789e175cd2cd.
 func InOut() (chan<- interface{}, <-chan interface{}) {
 	in := make(chan interface{})
 	out := make(chan interface{})
@@ -57,27 +59,52 @@ func InOut() (chan<- interface{}, <-chan interface{}) {
 }
 
 // Generates an integer array with indices from start to end with the given step value.
-// Returns an empty array if step is less than or equal to 0 or end is less than start.
+//
+// Returns an empty array if step is equal to 0 or end is less than start and step is a positive number.
 func Range(start, end, step int) []int {
-	if step <= 0 || end < start {
+	if step == 0 || (end < start && step > 0) {
 		return []int{}
 	}
-	s := make([]int, 0, 1+(end-start)/step)
-	for start <= end {
+
+	// Gets the absolute of an integer.
+	abs := func(x int) int {
+		if x < 0 {
+			return x * -1
+		}
+		return x
+	}
+
+	// For checking if the iteration still holds.
+	keepGoing := func(s, e int) bool {
+		if step < 0 {
+			return e <= s
+		} else {
+			return s <= e
+		}
+	}
+
+	s := make([]int, 0, 1+abs(end-start)/abs(step))
+	for keepGoing(start, end) {
 		s = append(s, start)
 		start += step
 	}
 	return s
 }
 
-func Max(x, y int) int {
-	if x < y {
-		return y
+const minInt = -int((^uint(0)) >> 1) - 1
+
+// Returns the maximum of all the given integers.
+func Max(numbers... int) (max int) {
+	max = minInt
+	for _, n := range numbers {
+		if n > max {
+			max = n
+		}
 	}
-	return x
+	return max
 }
 
-// Remove duplicates and sort an array of integers in place
+// Remove duplicates and sort an array of integers in place.
 func RemoveDuplicatesAndSort(indices *[]int) {
 	actualIndices := make([]int, 0)
 	indexSet := make(map[int]struct{})
@@ -95,10 +122,22 @@ func RemoveDuplicatesAndSort(indices *[]int) {
 	*indices = actualIndices
 }
 
+// Adds the given value at the given indices.
+//
+// If there is an index which exceeds the length of the given slice plus the number of unique indices given then this
+// will result in an new array that's the length of the maximum index in indices. If this happens then any "empty"
+// space will be filled by default by "nil".
 func AddElems(slice []interface{}, value interface{}, indices... int) []interface{} {
 	RemoveDuplicatesAndSort(&indices)
-	// Find the bounds of the new array which will contain the appended value
-	high := Max(indices[len(indices) - 1] + 1, len(slice))
+	// Find the bounds of the new array which will contain the appended value. This is either:
+	// 1. The maximum index: when it exceeds the limits of the new array which will be the length of the slice plus the number of indices
+	// 2. The length of the slice plus the number of indices: otherwise
+	var high int
+	if indices[len(indices) - 1] + 1 > len(slice) + len(indices) {
+		high = indices[len(indices) - 1] + 1
+	} else {
+		high = len(slice) + len(indices)
+	}
 	// Construct a new array from the specifications above
 	newArr := make([]interface{}, high)
 	offset := 0
@@ -124,6 +163,9 @@ func AddElems(slice []interface{}, value interface{}, indices... int) []interfac
 }
 
 // Removes the elements at the given indices in the given interface slice and returns a new slice.
+//
+// The new array will have a length which is the difference between the length of the given slice and the length of the
+// given indices as a unique set.
 func RemoveElems(slice []interface{}, indices... int) []interface{} {
 	RemoveDuplicatesAndSort(&indices)
 	out := make([]interface{}, 0)
@@ -159,7 +201,8 @@ func CopyMap(m map[string]interface{}) map[string]interface{} {
 }
 
 // Used in tests to check equality between two interface{}s.
-// NOTE this takes into account orderings.
+//
+// This takes into account orderings of slices.
 func JsonMapEqualTest(t *testing.T, actual, expected interface{}, forString string) {
 	if diff := deep.Equal(actual, expected); diff != nil {
 		var errB strings.Builder
