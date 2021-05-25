@@ -9,9 +9,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/andygello555/gotils/concurrency"
+	"github.com/andygello555/gotils/ints"
+	"github.com/andygello555/gotils/maps"
+	"github.com/andygello555/gotils/slices"
+	str "github.com/andygello555/gotils/strings"
 	"github.com/andygello555/json-dom/code"
 	"github.com/andygello555/json-dom/jom/json_map"
-	"github.com/andygello555/json-dom/utils"
+	"github.com/andygello555/json-dom/globals"
 	"github.com/hjson/hjson-go"
 	"github.com/robertkrimen/otto"
 	"reflect"
@@ -183,13 +188,13 @@ func filterRunner(obj interface{}, filterExp []byte, jsonMap map[string]interfac
 
 	// Return out if any errors have occurred
 	if err != nil {
-		return truers, utils.JsonPathError.FillError(err.Error())
+		return truers, globals.JsonPathError.FillError(err.Error())
 	}
 
 	// Replace all the occurrences of any JSON path expression within the filter expression with the
 	// literal evaluation of each JSON path calculated above
 	if len(jsonPathIndices) > 0 {
-		filterExp = []byte(utils.ReplaceCharIndexRange(string(filterExp), jsonPathIndices, jsonPathLiterals...))
+		filterExp = []byte(str.ReplaceCharIndexRange(string(filterExp), jsonPathIndices, jsonPathLiterals...))
 		// All string literal locations also have to be recalculated as there were changes made to the
 		// filter expression
 		stringLiteralLocs = stringLiterals.FindAllIndex(filterExp, -1)
@@ -242,22 +247,22 @@ func filterRunner(obj interface{}, filterExp []byte, jsonMap map[string]interfac
 			}
 			// Here we are just passing the literal string into the vm and parsing it to a JS value using JSON.parse
 			// Then setting the currentNode variable to be that value
-			err = vm.Set(utils.CurrentNodeLiteralVarName, string(literal))
+			err = vm.Set(globals.CurrentNodeLiteralVarName, string(literal))
 			if err != nil {
 				return err
 			}
 			var currentNodeValue otto.Value
-			currentNodeValue, err = vm.Run(fmt.Sprintf("JSON.parse(%s)", utils.CurrentNodeLiteralVarName))
+			currentNodeValue, err = vm.Run(fmt.Sprintf("JSON.parse(%s)", globals.CurrentNodeLiteralVarName))
 			if err != nil {
 				return err
 			}
-			err = vm.Set(utils.CurrentNodeValueVarName, currentNodeValue)
+			err = vm.Set(globals.CurrentNodeValueVarName, currentNodeValue)
 			if err != nil {
 				return err
 			}
 
 			// Finally replace all @s with the variable name "currentNode"
-			currentExpression = utils.ReplaceCharIndex(currentExpression, currentNodeIndices, utils.CurrentNodeValueVarName)
+			currentExpression = str.ReplaceCharIndex(currentExpression, currentNodeIndices, globals.CurrentNodeValueVarName)
 		}
 
 		// Evaluate the expression within the VM
@@ -271,8 +276,8 @@ func filterRunner(obj interface{}, filterExp []byte, jsonMap map[string]interfac
 				duration := time.Since(start)
 				if caught := recover(); caught != nil {
 					// If the caught error is the HaltingProblem var then package it up using FillError and set the outer error
-					if caught == utils.HaltingProblem {
-						err = utils.HaltingProblem.FillError(
+					if caught == globals.HaltingProblem {
+						err = globals.HaltingProblem.FillError(
 							duration.String(),
 							string(filterExp),
 						)
@@ -287,9 +292,9 @@ func filterRunner(obj interface{}, filterExp []byte, jsonMap map[string]interfac
 
 			// Start the timer
 			go func() {
-				time.Sleep(1 * utils.HaltingDelayUnits)
+				time.Sleep(1 * globals.HaltingDelayUnits)
 				vm.Interrupt <- func() {
-					panic(utils.HaltingProblem)
+					panic(globals.HaltingProblem)
 				}
 			}()
 			// NOTE: how we wrap the expression in !!() this is to try to convert to boolean
@@ -339,7 +344,7 @@ func filterRunner(obj interface{}, filterExp []byte, jsonMap map[string]interfac
 	}
 
 	if err != nil {
-		return nil, utils.JsonPathError.FillError(fmt.Sprintf("An error has occurred while evaluating the filter expression \"%s\": %v", string(filterExp), err))
+		return nil, globals.JsonPathError.FillError(fmt.Sprintf("An error has occurred while evaluating the filter expression \"%s\": %v", string(filterExp), err))
 	}
 
 	return truers, nil
@@ -359,7 +364,7 @@ func pathFinder(path []json_map.AbsolutePathKey, jsonMap map[string]interface{},
 		// Create a wait group which all Sub-Finders will be added to
 		var subWg sync.WaitGroup
 		// Create an in and out channel using the InOut data structure
-		inFound, outFound := utils.InOut()
+		inFound, outFound := concurrency.InOut()
 		toFind := key.Value.(string)
 		foundValues := make([]interface{}, 0)
 
@@ -437,7 +442,7 @@ func pathFinder(path []json_map.AbsolutePathKey, jsonMap map[string]interface{},
 	for _, key := range path {
 		// StartEnd KeyTypes must be within a Slice key type so throw an error if so
 		if key.KeyType == json_map.StartEnd {
-			err = utils.JsonPathError.FillError("Cannot have a start/end key type outside a slice key type")
+			err = globals.JsonPathError.FillError("Cannot have a start/end key type outside a slice key type")
 			break
 		}
 
@@ -450,11 +455,11 @@ func pathFinder(path []json_map.AbsolutePathKey, jsonMap map[string]interface{},
 			case json_map.StringKey:
 				if currValue, ok = m[key.Value.(string)]; !ok {
 					// If the key does not exist then push to the error channel and return
-					err = utils.JsonPathError.FillError(fmt.Sprintf("Key '%v' does not exist in map", key.Value))
+					err = globals.JsonPathError.FillError(fmt.Sprintf("Key '%v' does not exist in map", key.Value))
 					break
 				}
 			case json_map.IndexKey | json_map.Slice:
-				err = utils.JsonPathError.FillError(fmt.Sprintf("Cannot access map %v with numerical key %v", currValue, key.Value))
+				err = globals.JsonPathError.FillError(fmt.Sprintf("Cannot access map %v with numerical key %v", currValue, key.Value))
 				break
 			case json_map.Wildcard:
 				// For wildcards return all the values of each key within the map
@@ -463,7 +468,7 @@ func pathFinder(path []json_map.AbsolutePathKey, jsonMap map[string]interface{},
 				// {"person", "friends", 0, *, 1}
 				// We have to first push all the keys to a heap and then pop them off so that we have the same order
 				// each time we evaluate this map
-				keyQueue := make(utils.StringHeap, 0)
+				keyQueue := make(str.StringHeap, 0)
 				for k := range m {
 					keyQueue = append(keyQueue, k)
 				}
@@ -496,7 +501,7 @@ func pathFinder(path []json_map.AbsolutePathKey, jsonMap map[string]interface{},
 				}
 				// If there is nothing to recurse down then throw error
 				if len(keys) == 0 {
-					err = utils.JsonPathError.FillError(fmt.Sprintf("There are no maps to recurse down in %v", m))
+					err = globals.JsonPathError.FillError(fmt.Sprintf("There are no maps to recurse down in %v", m))
 					break
 				}
 				// Otherwise sort the strings and take the value of the first key as the new current value
@@ -507,7 +512,7 @@ func pathFinder(path []json_map.AbsolutePathKey, jsonMap map[string]interface{},
 				currValue = recursiveLookup(key, m)
 				break
 			default:
-				err = utils.JsonPathError.FillError(fmt.Sprintf("AbsolutePathKey of type: %v is unrecognised", key.KeyType))
+				err = globals.JsonPathError.FillError(fmt.Sprintf("AbsolutePathKey of type: %v is unrecognised", key.KeyType))
 				break
 			}
 		case []interface{}:
@@ -531,7 +536,7 @@ func pathFinder(path []json_map.AbsolutePathKey, jsonMap map[string]interface{},
 			case json_map.IndexKey:
 				i := key.Value.(int)
 				if i >= len(arr) || i < 0 {
-					err = utils.JsonPathError.FillError(fmt.Sprintf("Index (%d) is out of bounds for array of length %d", i, len(arr)))
+					err = globals.JsonPathError.FillError(fmt.Sprintf("Index (%d) is out of bounds for array of length %d", i, len(arr)))
 					break
 				}
 				//fmt.Println("Getting index:", i, "from", arr, "=", arr[i])
@@ -547,7 +552,7 @@ func pathFinder(path []json_map.AbsolutePathKey, jsonMap map[string]interface{},
 					break
 				}
 			case json_map.First:
-				err = utils.JsonPathError.FillError("Cannot recurse into an array")
+				err = globals.JsonPathError.FillError("Cannot recurse into an array")
 				break
 			case json_map.Slice:
 				// For slices we'll see if we can do the slice natively in go ([start:end], [:end], [start:])
@@ -582,7 +587,7 @@ func pathFinder(path []json_map.AbsolutePathKey, jsonMap map[string]interface{},
 							case error:
 								// Wrap the error as a JsonPathError if the error has something to do with slices
 								if strings.Contains(caught.(error).Error(), "slice") {
-									err = utils.JsonPathError.FillError(fmt.Sprintf("Slice error occured: %v", caught))
+									err = globals.JsonPathError.FillError(fmt.Sprintf("Slice error occured: %v", caught))
 								} else {
 									// Otherwise something more awful has gone wrong
 									panic(caught)
@@ -606,11 +611,11 @@ func pathFinder(path []json_map.AbsolutePathKey, jsonMap map[string]interface{},
 				currValue = recursiveLookup(key, arr)
 				break
 			default:
-				err = utils.JsonPathError.FillError(fmt.Sprintf("AbsolutePathKey of type: %v is unrecognised", key.KeyType))
+				err = globals.JsonPathError.FillError(fmt.Sprintf("AbsolutePathKey of type: %v is unrecognised", key.KeyType))
 				break
 			}
 		default:
-			err = utils.JsonPathError.FillError(fmt.Sprintf("Cannot access key %v of type %s", key, reflect.TypeOf(currValue).Name()))
+			err = globals.JsonPathError.FillError(fmt.Sprintf("Cannot access key %v of type %s", key, reflect.TypeOf(currValue).Name()))
 			break
 		}
 	}
@@ -752,12 +757,12 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 			setterArr := func(arrRef *[]interface{}, indices... int) {
 				// If the length of indices is 0 then we assume that the caller wants all the indices
 				if len(indices) == 0 {
-					indices = utils.Range(0, len(*arrRef) - 1, 1)
+					indices = ints.Range(0, len(*arrRef) - 1, 1)
 				}
 
 				if deleteVal {
-					// Delete indices using the RemoveElems from utils
-					*arrRef = utils.RemoveElems(*arrRef, indices...)
+					// Delete indices using the RemoveElems from gotils
+					*arrRef = slices.RemoveElems(*arrRef, indices...)
 				} else {
 					// We have to iterate through all indices and set the according values
 					for _, idx := range indices {
@@ -778,7 +783,7 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 					case map[string]interface{}:
 						subM := subtree.(map[string]interface{})
 						// Create a copy of the map to store the updated subtree in
-						newSubtreeM := utils.CopyMap(subM)
+						newSubtreeM := maps.CopyMap(subM)
 
 						// Recurse into all the other keys within the map and set the new subtrees returned in the
 						// clone of the current subtree (newSubtreeM)
@@ -820,7 +825,7 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 				switch arrOrMap.(type) {
 				case map[string]interface{}:
 					m := arrOrMap.(map[string]interface{})
-					mCopy := utils.CopyMap(m)
+					mCopy := maps.CopyMap(m)
 					for k, v := range m {
 						mCopy[k] = subFinder(v, toFind)
 					}
@@ -980,7 +985,7 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 					}
 
 					// Then we iterate through a range of slice indices
-					setterArr(&arr, utils.Range(sliceIndices[0], sliceIndices[1] - 1, 1)...)
+					setterArr(&arr, ints.Range(sliceIndices[0], sliceIndices[1] - 1, 1)...)
 				case json_map.RecursiveLookup:
 					// NOTE: The RecursiveLookup case is a special scenario where the traversal is continued within the
 					// recursive lookup function. This means after the function returns we can empty the path queue so
@@ -1045,7 +1050,7 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 
 // Given a valid JSON path will return the list of pointers to json_map.JsonPathNode(s) that satisfies the JSON path.
 //
-// A wrapper for utils.ParseJsonPath and GetAbsolutePaths.
+// A wrapper for json_map.ParseJsonPath and GetAbsolutePaths.
 // Note: The JSON path syntax is very particular. If a JSON path is not being parsed make sure it looks like the below examples.
 //
 // This function supports the following JSON path syntax:
@@ -1123,7 +1128,7 @@ func (jsonMap *JsonMap) JsonPathSelector(jsonPath string) (out []*json_map.JsonP
 
 	// Handle errors
 	if errs != nil {
-		return nil, utils.JsonPathError.FillFromErrors(errs)
+		return nil, globals.JsonPathError.FillFromErrors(errs)
 	}
 	return values, nil
 }
@@ -1131,7 +1136,7 @@ func (jsonMap *JsonMap) JsonPathSelector(jsonPath string) (out []*json_map.JsonP
 // Given a valid JSON path: will set the values pointed to by the JSON path to be the value given.
 //
 // If nil is given as the value then the pointed to elements will be deleted.
-// A wrapper for utils.ParseJsonPath -> SetAbsolutePaths.
+// A wrapper for json_map.ParseJsonPath -> SetAbsolutePaths.
 func (jsonMap *JsonMap) JsonPathSetter(jsonPath string, value interface{}) (err error) {
 	var paths json_map.AbsolutePaths
 	paths, err = json_map.ParseJsonPath(jsonPath)
@@ -1150,10 +1155,10 @@ func (jsonMap *JsonMap) JsonPathSetter(jsonPath string, value interface{}) (err 
 func (jsonMap *JsonMap) MarkupCode(jsonPath string, shebangName string, script string) (err error)  {
 	// Check if the shebangName is a valid and supported shebangName
 	if !code.CheckIfSupported(shebangName) {
-		return utils.UnsupportedScriptLang.FillError(shebangName)
+		return globals.UnsupportedScriptLang.FillError(shebangName)
 	}
 	// Construct the script
-	constructedScript := fmt.Sprintf("%s%s\n%s", utils.ShebangPrefix, shebangName, script)
+	constructedScript := fmt.Sprintf("%s%s\n%s", globals.ShebangPrefix, shebangName, script)
 	// Run JsonPathSetter
 	err = jsonMap.JsonPathSetter(jsonPath, constructedScript)
 	return err
@@ -1272,7 +1277,7 @@ func (jsonMap *JsonMap) Run() {
 	}
 
 	// Get all script keys at the current level
-	scriptQueue := make(utils.StringHeap, 0)
+	scriptQueue := make(str.StringHeap, 0)
 	for k, e := range jsonMap.traversal.script {
 		switch e.(type) {
 		case code.Code:
@@ -1471,7 +1476,7 @@ func (jsonMap *JsonMap) MustPush(jsonPath string, value interface{}, indices... 
 		indices = append(indices, len(nodes))
 	}
 	// Use the AddElems utility to add the value at the given indices
-	newArr := utils.AddElems(nodes, value, indices...)
+	newArr := slices.AddElems(nodes, value, indices...)
 
 	// Finally we set the same path we are given to be the newArr
 	jsonMap.MustSet(jsonPath, newArr)
@@ -1502,7 +1507,7 @@ func (jsonMap *JsonMap) MustPop(jsonPath string, indices... int) (popped []inter
 	}
 
 	// We get the popped elements and the new array at the some time
-	utils.RemoveDuplicatesAndSort(&indices)
+	slices.RemoveDuplicatesAndSort(&indices)
 	popped = make([]interface{}, 0)
 	newArr := make([]interface{}, 0)
 

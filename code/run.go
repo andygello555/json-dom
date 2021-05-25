@@ -3,7 +3,7 @@ package code
 import (
 	"fmt"
 	"github.com/andygello555/json-dom/jom/json_map"
-	"github.com/andygello555/json-dom/utils"
+	"github.com/andygello555/json-dom/globals"
 )
 
 // Describes a language which is supported (can be run) from within a JOM.
@@ -53,5 +53,5 @@ func Run(code Code, jsonMap json_map.JsonMapInt) (data json_map.JsonMapInt, err 
 		return supportedLang.runCode(code, jsonMap)
 	}
 	//fmt.Println(supportedLangs)
-	return nil, utils.UnsupportedScriptLang.FillError(code.ScriptLangShebang(), fmt.Sprintf(utils.ScriptErrorFormatString, jsonMap.GetCurrentScopePath(), "func(json json_map.JsonMapInt)"))
+	return nil, globals.UnsupportedScriptLang.FillError(code.ScriptLangShebang(), fmt.Sprintf(globals.ScriptErrorFormatString, jsonMap.GetCurrentScopePath(), "func(json json_map.JsonMapInt)"))
 }

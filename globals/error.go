@@ -1,4 +1,4 @@
-package utils
+package globals
 
 import (
 	"errors"
@@ -8,13 +8,17 @@ import (
 	"strings"
 )
 
-// CliError type for handling errors which occur in the CLI
+// CliError type for handling errors which occur in the CLI.
 type CliError struct {
-	code     int	 // The return code
-	internal bool    // Whether or not the error is internal or down to user input
-	message  string  // The message to print along with the err message if given
+	// The return code.
+	code     int
+	// Whether or not the error is internal or down to user input.
+	internal bool
+	// The message to print along with the err message if given.
+	message  string
 }
 
+// CliError(s) (positive codes).
 var (
 	ParseErr            = CliError{1, true, "Parse error has occurred"}
 	FormatErr           = CliError{2, true, "Format error has occurred"}
@@ -28,6 +32,7 @@ var (
 	MarkupErr			= CliError{11, false, "MARKUP ERROR"}
 )
 
+// Handles print of error details and exit codes of CliError.
 func (e *CliError) Handle(err error, flagSetArray ...*flag.FlagSet) {
 	if err != nil {
 		fmt.Println(e.message + ":", err)
@@ -51,12 +56,17 @@ func (e *CliError) Handle(err error, flagSetArray ...*flag.FlagSet) {
 	os.Exit(e.code)
 }
 
+// For handling errors that occur at runtime.
 type RuntimeError struct {
+	// The code of the error. No real use other than identification.
+	//
+	// Note: All RuntimeError(s) have negative codes.
 	code    int
+	// The main message which will prefix any handled errors.
 	message string
 }
 
-// Runtime errors (negative codes)
+// RuntimeError(s) (negative codes).
 var (
 	HaltingProblem        = RuntimeError{-1, "Infinite loop has occurred after"}
 	UnsupportedScriptLang = RuntimeError{-2, "Unsupported script language in shebang"}
@@ -66,7 +76,7 @@ var (
 	JsonPathError		  = RuntimeError{-6, "A JSON path could not be evaluated for the following reasons"}
 )
 
-// Fill out a RuntimeError error with the given extra info
+// Fill out a RuntimeError error with the given extra info.
 func (e *RuntimeError) FillError(extraInfo ...string) error {
 	var b strings.Builder
 	for i, s := range extraInfo {
@@ -87,6 +97,7 @@ func (e *RuntimeError) FillError(extraInfo ...string) error {
 	return errors.New(message)
 }
 
+// Fill out a RuntimeError error with the given list of errors.
 func (e *RuntimeError) FillFromErrors(errs []error) error {
 	// Create an array of the error messages so that they can be re-wrapped into another RuntimeError
 	errString := make([]string, len(errs))

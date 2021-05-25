@@ -3,7 +3,8 @@ package json_map
 import (
 	"bufio"
 	"fmt"
-	"github.com/andygello555/json-dom/utils"
+	str "github.com/andygello555/gotils/strings"
+	"github.com/andygello555/json-dom/globals"
 	"io"
 	"regexp"
 	"strconv"
@@ -67,7 +68,7 @@ var (
 		validator:  func(token []byte, togo []byte) (absolutePathKeys []AbsolutePathKey, errs []error) {
 			// Function to remove square braces and whitespace then split at the given separator
 			stripSplitIndex := func(token []byte, separator string) []string {
-				return strings.Split(utils.StripWhitespace(string(regexp.MustCompile("[\\[\\]]").ReplaceAll(token, []byte("")))), separator)
+				return strings.Split(str.StripWhitespace(string(regexp.MustCompile("[\\[\\]]").ReplaceAll(token, []byte("")))), separator)
 			}
 
 			// Create an array of AbsolutePathKeys which will be added to the AbsolutePaths at the end
@@ -77,7 +78,7 @@ var (
 				// Normal array index
 				n, err := strconv.Atoi(string(regexp.MustCompile("\\d+").Find(token)))
 				if err != nil {
-					return absolutePathKeys, []error{utils.JsonPathError.FillError(fmt.Sprintf("Could not convert index %s into an integer", string(token)))}
+					return absolutePathKeys, []error{globals.JsonPathError.FillError(fmt.Sprintf("Could not convert index %s into an integer", string(token)))}
 				}
 				// Add n to the end of all absolute paths
 				absolutePathKeys = append(absolutePathKeys, AbsolutePathKey{KeyType: IndexKey, Value: n})
@@ -89,7 +90,7 @@ var (
 				for _, index := range stripSplitIndex(token, ",") {
 					indexInt, err := strconv.Atoi(index)
 					if err != nil {
-						return absolutePathKeys, []error{utils.JsonPathError.FillError(fmt.Sprintf("Could not convert index %v in token %s into an integer", index, string(token)))}
+						return absolutePathKeys, []error{globals.JsonPathError.FillError(fmt.Sprintf("Could not convert index %v in token %s into an integer", index, string(token)))}
 					}
 					absolutePathKeys = append(absolutePathKeys, AbsolutePathKey{
 						KeyType: IndexKey,
@@ -112,7 +113,7 @@ var (
 					if index != "" {
 						indexInt, err := strconv.Atoi(index)
 						if err != nil {
-							return absolutePathKeys, []error{utils.JsonPathError.FillError(fmt.Sprintf("Could not convert index %v in token %s into an integer", index, string(token)))}
+							return absolutePathKeys, []error{globals.JsonPathError.FillError(fmt.Sprintf("Could not convert index %v in token %s into an integer", index, string(token)))}
 						}
 						slice = append(slice, AbsolutePathKey{
 							KeyType: IndexKey,
@@ -122,7 +123,7 @@ var (
 						// If the blank flag has already been set then throw an error
 						// NOTE we don't allow [:] syntax as we already have [*]
 						if blank {
-							return absolutePathKeys, []error{utils.JsonPathError.FillError("Syntax '[:]' is not supported, use '[*]' instead")}
+							return absolutePathKeys, []error{globals.JsonPathError.FillError("Syntax '[:]' is not supported, use '[*]' instead")}
 						}
 						// Append a StartEnd token
 						slice = append(slice, AbsolutePathKey{
@@ -229,21 +230,21 @@ func (s *state) handler(togo []byte, absolutePaths *AbsolutePaths) (next *state,
 			for _, possibleState := range possibleStates {
 				possibleStateNames = append(possibleStateNames, possibleState.name)
 			}
-			return nil, utils.JsonPathError.FillError(fmt.Sprintf("Could not find any of the possible states: %v, when at a %s: '%s'", possibleStateNames, s.name, token))
+			return nil, globals.JsonPathError.FillError(fmt.Sprintf("Could not find any of the possible states: %v, when at a %s: '%s'", possibleStateNames, s.name, token))
 		}
 		//fmt.Println("next state:", next)
 
 		// Run the validator for the next state
 		nextPaths, errs := next.validator(token, togo)
 		if errs != nil {
-			return nil, utils.JsonPathError.FillFromErrors(errs)
+			return nil, globals.JsonPathError.FillFromErrors(errs)
 		}
 		//fmt.Println("nextPaths:", nextPaths, "token:", string(token), "togo:", string(togo))
 
 		// Add the nextPath variable to the end of all absolute paths
 		errs = absolutePaths.AddToAll(nil, false, nextPaths...)
 		if errs != nil {
-			return nil, utils.JsonPathError.FillFromErrors(errs)
+			return nil, globals.JsonPathError.FillFromErrors(errs)
 		}
 	} else {
 		next = &end
@@ -279,7 +280,7 @@ func ParseJsonPath(jsonPath string) (absolutePaths AbsolutePaths, err error) {
 		occurrences := currentState.tokenRegex.FindIndex(next)
 		// If there are no occurrences found or the occurrence doesn't start at the beginning of the buffer then error out
 		if len(occurrences) == 0 || occurrences[0] != 0 {
-			err = utils.JsonPathError.FillError(fmt.Sprintf("%s token does not come after %s", currentState.name, previousState.name))
+			err = globals.JsonPathError.FillError(fmt.Sprintf("%s token does not come after %s", currentState.name, previousState.name))
 			break
 		}
 

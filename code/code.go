@@ -10,7 +10,7 @@ package code
 import (
 	"fmt"
 	"github.com/andygello555/json-dom/jom/json_map"
-	"github.com/andygello555/json-dom/utils"
+	"github.com/andygello555/json-dom/globals"
 	"strings"
 )
 
@@ -32,9 +32,9 @@ type Code struct {
 	ScriptLang ScriptLangType
 }
 
-// Uses utils.ScriptErrorFormatString to return a string with both the script and the script language.
+// Uses globals.ScriptErrorFormatString to return a string with both the script and the script language.
 func (code *Code) String() string {
-	return fmt.Sprintf(utils.ScriptErrorFormatString, code.ScriptLangShebang(), fmt.Sprintf("%v", code.Script))
+	return fmt.Sprintf(globals.ScriptErrorFormatString, code.ScriptLangShebang(), fmt.Sprintf("%v", code.Script))
 }
 
 // Gets all the shebang suffixes for the given ScriptLangType.
@@ -74,9 +74,9 @@ func NewFrom(from interface{}) (code Code, ok bool) {
 		firstLen := len(firstLine)
 
 		// First check the bounds of the line so that we won't panic
-		if firstLen >= utils.ShebangLen + utils.ShortestSupportedScriptTagLen && firstLen <= utils.ShebangLen + utils.LongestSupportedScriptTagLen {
-			shebangPrefix, shebangScriptLang := firstLine[:utils.ShebangLen], firstLine[utils.ShebangLen:]
-			if shebangPrefix != utils.ShebangPrefix {
+		if firstLen >= globals.ShebangLen + globals.ShortestSupportedScriptTagLen && firstLen <= globals.ShebangLen + globals.LongestSupportedScriptTagLen {
+			shebangPrefix, shebangScriptLang := firstLine[:globals.ShebangLen], firstLine[globals.ShebangLen:]
+			if shebangPrefix != globals.ShebangPrefix {
 				break
 			}
 
@@ -87,7 +87,7 @@ func NewFrom(from interface{}) (code Code, ok bool) {
 			if !CheckIfSupported(shebangScriptLang) {
 				// We are going to panic here as the script is unsupported
 				// NOTE this will only panic when the shebang script is between the shortest and the longest supported lengths
-				panic(utils.UnsupportedScriptLang.FillError(shebangScriptLang, fmt.Sprintf(utils.ScriptErrorFormatString, utils.AnonymousScriptPath, script)))
+				panic(globals.UnsupportedScriptLang.FillError(shebangScriptLang, fmt.Sprintf(globals.ScriptErrorFormatString, globals.AnonymousScriptPath, script)))
 			}
 			code.ScriptLang = ShebangScriptLang(shebangScriptLang)
 			ok = true

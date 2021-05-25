@@ -3,9 +3,10 @@ package tests
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/andygello555/gotils/maps"
 	"github.com/andygello555/json-dom/jom"
 	"github.com/andygello555/json-dom/jom/json_map"
-	"github.com/andygello555/json-dom/utils"
+	"github.com/andygello555/json-dom/globals"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
@@ -246,7 +247,7 @@ var exampleSetAbsolutePathInput = []setAbsolutePathExample{
 				{json_map.StringKey, "script"},
 			},
 		},
-		fmt.Sprintf("%sjs\n%s\n%s\n%s\n%s\n", utils.ShebangPrefix,
+		fmt.Sprintf("%sjs\n%s\n%s\n%s\n%s\n", globals.ShebangPrefix,
 			"var first_last = json.trail.name.split(' ');",
 			"json.trail['first_name'] = first_last[0];",
 			"json.trail['last_name'] = first_last[1];",
@@ -538,6 +539,6 @@ func TestSetAbsolutePaths(t *testing.T) {
 		//fmt.Println(string(b))
 
 		// Check for equality between jsonMap and expected output
-		utils.JsonMapEqualTest(t, insides, exampleSetAbsolutePathOutput[i], fmt.Sprintf("absolute paths: %v and value: %v (example %d)", exampleAbsolutePaths.absolutePaths, exampleAbsolutePaths.value, i + 1))
+		maps.JsonMapEqualTest(t, insides, exampleSetAbsolutePathOutput[i], fmt.Sprintf("absolute paths: %v and value: %v (example %d)", exampleAbsolutePaths.absolutePaths, exampleAbsolutePaths.value, i + 1))
 	}
 }

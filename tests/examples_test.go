@@ -18,11 +18,12 @@ package tests
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/andygello555/gotils/maps"
 	_ "github.com/andygello555/json-dom/code/go"
 	"github.com/andygello555/json-dom/code/js"
 	"github.com/andygello555/json-dom/jom"
 	"github.com/andygello555/json-dom/jom/json_map"
-	"github.com/andygello555/json-dom/utils"
+	"github.com/andygello555/json-dom/globals"
 	"io/ioutil"
 	"path/filepath"
 	"strconv"
@@ -328,7 +329,7 @@ func init() {
 	js.ExternalConsoleLogStderr = &stderrBuffer
 
 	// Set the halting time delay so that the halting problem examples run a bit quicker
-	utils.HaltingDelay = 1
+	globals.HaltingDelay = 1
 }
 
 func TestExamples(t *testing.T) {
@@ -416,7 +417,7 @@ func TestExamples(t *testing.T) {
 							//fmt.Println(string(b))
 
 							// Finally, compare the insides of the JsonMap with the Unmarshalled expected output from the example_out dir
-							utils.JsonMapEqualTest(ttt, insides, example.out, fmt.Sprintf("\"%s\"", example.name))
+							maps.JsonMapEqualTest(ttt, insides, example.out, fmt.Sprintf("\"%s\"", example.name))
 						}
 					})
 				}

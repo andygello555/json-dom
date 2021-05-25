@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/andygello555/json-dom/code"
 	"github.com/andygello555/json-dom/jom/json_map"
-	"github.com/andygello555/json-dom/utils"
+	"github.com/andygello555/json-dom/globals"
 	"time"
 )
 
@@ -25,7 +25,7 @@ func init() {
 // Halting Problem
 //
 // The given callback within code will be wrapped in a goroutine which will push an interrupt once the callback has finished.
-// If the callback doesn't finish within utils.HaltingDelay seconds a separate goroutine will push the interrupt which
+// If the callback doesn't finish within globals.HaltingDelay seconds a separate goroutine will push the interrupt which
 // will cause RunCallback to return early.
 //
 // Note: If a halting problem issue occurs then there will be a goroutine running the callback until it has finished, which may be never.
@@ -51,10 +51,10 @@ func RunCallback(code code.Code, jsonMap json_map.JsonMapInt) (data json_map.Jso
 		duration := time.Since(start)
 		if caught := recover(); caught != nil {
 			// If the caught error is the HaltingProblem var then package it up using FillError and set the outer error
-			if caught == utils.HaltingProblem {
-				err = utils.HaltingProblem.FillError(
+			if caught == globals.HaltingProblem {
+				err = globals.HaltingProblem.FillError(
 					duration.String(),
-					fmt.Sprintf(utils.ScriptErrorFormatString, jsonMap.GetCurrentScopePath(), fmt.Sprintf("%v", code.Script)),
+					fmt.Sprintf(globals.ScriptErrorFormatString, jsonMap.GetCurrentScopePath(), fmt.Sprintf("%v", code.Script)),
 				)
 				return
 			}
@@ -65,7 +65,7 @@ func RunCallback(code code.Code, jsonMap json_map.JsonMapInt) (data json_map.Jso
 
 	// Start the timer which will also write to the interrupt channel to indicate that we are finished
 	go func() {
-		time.Sleep(time.Duration(utils.HaltingDelay) * utils.HaltingDelayUnits)
+		time.Sleep(time.Duration(globals.HaltingDelay) * globals.HaltingDelayUnits)
 		interrupt <- true
 	}()
 

@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"github.com/andygello555/json-dom/code"
 	"github.com/andygello555/json-dom/jom/json_map"
-	"github.com/andygello555/json-dom/utils"
+	"github.com/andygello555/json-dom/globals"
 	"github.com/robertkrimen/otto"
 	"io"
 	"os"
@@ -110,11 +110,11 @@ func composePrint(call otto.FunctionCall) *strings.Builder {
 	} else {
 		// Check if json.__scopePath__ is not a string (it has been overridden by user)
 		if !get.IsString() {
-			panic(utils.OverriddenBuiltin.FillError("json.scopePath"))
+			panic(globals.OverriddenBuiltin.FillError("json.scopePath"))
 		}
 		callLocation = fmt.Sprintf("<%s>", get.String())
 	}
-	_, _ = fmt.Fprintln(&out, "call from:", strings.Replace(call.CallerLocation(), utils.AnonymousScriptPath, callLocation, -1))
+	_, _ = fmt.Fprintln(&out, "call from:", strings.Replace(call.CallerLocation(), globals.AnonymousScriptPath, callLocation, -1))
 	var b strings.Builder
 	argList := call.ArgumentList
 
@@ -167,12 +167,12 @@ func jsonPathSelector(call otto.FunctionCall) otto.Value {
 	getJsonMap := func(vm *otto.Otto) json_map.JsonMapInt {
 		// Stringify the json.trail object
 		var trailStringValue otto.Value
-		trailStringValue, err = vm.Run(fmt.Sprintf("JSON.stringify(%s.trail)", utils.JOMVariableName))
+		trailStringValue, err = vm.Run(fmt.Sprintf("JSON.stringify(%s.trail)", globals.JOMVariableName))
 		if err != nil || trailStringValue.IsUndefined() || trailStringValue.IsNull() || !trailStringValue.IsString() {
 			if err != nil {
 				throw(err.Error())
 			}
-			throw(fmt.Sprintf("\"%s.trail\" is not JSON stringifiable. It is \"%v\".", utils.JOMVariableName, trailStringValue))
+			throw(fmt.Sprintf("\"%s.trail\" is not JSON stringifiable. It is \"%v\".", globals.JOMVariableName, trailStringValue))
 		}
 		// Marshall the JSON string into a JsonMap
 		trailString, _ := trailStringValue.ToString()
@@ -188,7 +188,7 @@ func jsonPathSelector(call otto.FunctionCall) otto.Value {
 	getAbsPaths := func(absolutePaths *json_map.AbsolutePaths, jMap json_map.JsonMapInt) []*json_map.JsonPathNode {
 		values, errs := jMap.GetAbsolutePaths(absolutePaths)
 		if errs != nil {
-			throw(utils.JsonPathError.FillFromErrors(errs).Error())
+			throw(globals.JsonPathError.FillFromErrors(errs).Error())
 		}
 		return values
 	}
@@ -322,8 +322,8 @@ func jsonPathSelector(call otto.FunctionCall) otto.Value {
 			throw("Could not JOM-ify modified JsonMap")
 		}
 
-		_ = call.Otto.Set(utils.ModifiedTrailValueVarName, trail)
-		_, err = call.Otto.Run(fmt.Sprintf("json[\"trail\"] = %s", utils.ModifiedTrailValueVarName))
+		_ = call.Otto.Set(globals.ModifiedTrailValueVarName, trail)
+		_, err = call.Otto.Run(fmt.Sprintf("json[\"trail\"] = %s", globals.ModifiedTrailValueVarName))
 		if err != nil {
 			throw(err.Error())
 		}
@@ -355,12 +355,12 @@ var builtinVars = []struct{
 	getter func(...interface{}) interface{}
 }{
 	// Construct the main JOM object
-	{utils.JOMVariableName, func(i ...interface{}) interface{} {
+	{globals.JOMVariableName, func(i ...interface{}) interface{} {
 		runtime := i[0].(*otto.Otto)
 		jsonMap := i[1].(json_map.JsonMapInt)
 		trail, err := createJom(jsonMap)
 		if err != nil {
-			panic(utils.BuiltinGetterError.FillError("json.trail", "Could not JOM-ify", err.Error()))
+			panic(globals.BuiltinGetterError.FillError("json.trail", "Could not JOM-ify", err.Error()))
 		}
 		jom := map[string]interface{} {
 			"trail": trail,
@@ -368,7 +368,7 @@ var builtinVars = []struct{
 			"scopePath": jsonMap.GetCurrentScopePath(),
 		}
 		if val, err := runtime.ToValue(jom); err != nil {
-			panic(utils.BuiltinGetterError.FillError("json", "Could not convert JOM into otto.Value"))
+			panic(globals.BuiltinGetterError.FillError("json", "Could not convert JOM into otto.Value"))
 		} else {
 			return val
 		}
@@ -388,7 +388,7 @@ var builtinVars = []struct{
 			},
 		}
 		if val, err := runtime.ToValue(consoleObj); err != nil {
-			panic(utils.BuiltinGetterError.FillError("console", "Could not convert console obj to otto.Value"))
+			panic(globals.BuiltinGetterError.FillError("console", "Could not convert console obj to otto.Value"))
 		} else {
 			return val
 		}
@@ -434,7 +434,7 @@ func deJomIfy(jsonMap json_map.JsonMapInt, env *otto.Otto) (data json_map.JsonMa
 
 	// Stringify and return the JOM (as a string)
 	// NOTE JSON.stringify will strip keys that are functions out from the object
-	run, err := env.Run(fmt.Sprintf("JSON.stringify(%s.trail)", utils.JOMVariableName))
+	run, err := env.Run(fmt.Sprintf("JSON.stringify(%s.trail)", globals.JOMVariableName))
 	if err != nil {
 		return nil, err
 	}
@@ -477,7 +477,7 @@ func RunScript(code code.Code, jsonMap json_map.JsonMapInt) (data json_map.JsonM
 	for _, builtin := range builtinVars {
 		var err error
 		switch builtin.name {
-		case utils.JOMVariableName:
+		case globals.JOMVariableName:
 			err = vm.Set(builtin.name, builtin.getter(vm, jsonMap))
 		case "console":
 			err = vm.Set(builtin.name, builtin.getter(vm))
@@ -497,10 +497,10 @@ func RunScript(code code.Code, jsonMap json_map.JsonMapInt) (data json_map.JsonM
 		duration := time.Since(start)
 		if caught := recover(); caught != nil {
 			// If the caught error is the HaltingProblem var then package it up using FillError and set the outer error
-			if caught == utils.HaltingProblem {
-				err = utils.HaltingProblem.FillError(
+			if caught == globals.HaltingProblem {
+				err = globals.HaltingProblem.FillError(
 					duration.String(),
-					fmt.Sprintf(utils.ScriptErrorFormatString, jsonMap.GetCurrentScopePath(), script),
+					fmt.Sprintf(globals.ScriptErrorFormatString, jsonMap.GetCurrentScopePath(), script),
 				)
 				return
 			}
@@ -513,16 +513,16 @@ func RunScript(code code.Code, jsonMap json_map.JsonMapInt) (data json_map.JsonM
 
 	// Start the timer
 	go func() {
-		time.Sleep(time.Duration(utils.HaltingDelay) * utils.HaltingDelayUnits)
+		time.Sleep(time.Duration(globals.HaltingDelay) * globals.HaltingDelayUnits)
 		vm.Interrupt <- func() {
-			panic(utils.HaltingProblem)
+			panic(globals.HaltingProblem)
 		}
 	}()
 	// Run the script
 	_, err = vm.Run(script)
 	if err != nil {
 		// Re-wrap the error as a ScriptError
-		return nil, utils.ScriptError.FillError(err.Error(), fmt.Sprintf(utils.ScriptErrorFormatString, jsonMap.GetCurrentScopePath(), script))
+		return nil, globals.ScriptError.FillError(err.Error(), fmt.Sprintf(globals.ScriptErrorFormatString, jsonMap.GetCurrentScopePath(), script))
 	}
 
 	// De-JOM-ify the environment and return the json_map.JsonMapInt
