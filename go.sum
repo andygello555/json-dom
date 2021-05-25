@@ -1,5 +1,5 @@
-github.com/andygello555/gotils v0.1.0 h1:RxMy96z8tioEElMpcFklJnvBiyna7+4U8Xg+SJteCHE=
-github.com/andygello555/gotils v0.1.0/go.mod h1:h4wJj0wIGDM2VxT87YnrFQC3S5TMebHrlCsivq8ysIw=
+github.com/andygello555/gotils v1.0.0 h1:VevV1crB+BrcVvQqUObL/zNwKRRCIT3Bsuu9R6YJdOg=
+github.com/andygello555/gotils v1.0.0/go.mod h1:h4wJj0wIGDM2VxT87YnrFQC3S5TMebHrlCsivq8ysIw=
 github.com/go-test/deep v1.0.7 h1:/VSMRlnY/JSyqxQUzQLKVMAskpY/NZKFA5j2P+0pP2M=
 github.com/go-test/deep v1.0.7/go.mod h1:QV8Hv/iy04NyLBxAdO9njL0iVPN1S4d/A3NVv1V36o8=
 github.com/hjson/hjson-go v3.1.0+incompatible h1:DY/9yE8ey8Zv22bY+mHV1uk2yRy0h8tKhZ77hEdi0Aw=

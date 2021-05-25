@@ -322,7 +322,7 @@ Scripts are run using the [otto](https://pkg.go.dev/github.com/robertkrimen/otto
 - Otto targets ES5. ES6 features are not supported.
   - Typed arrays
   - `let` and `const` variable definitions
-- Although not really a caveat: scripts that run for over `utils.HaltingDelay` seconds will terminate to avoid the **halting problem**
+- Although not really a caveat: scripts that run for over `globals.HaltingDelay` seconds will terminate to avoid the **halting problem**
 - `setInterval` and `setTimeout` are not supported and will probably never be supported
   - **json-dom was designed to be non-blocking**
 

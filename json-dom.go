@@ -184,7 +184,7 @@ func main() {
 						fmt.Println("\nfiles:")
 					}
 					for _, file := range *filesPtr {
-						exists := files.CheckFileExists(file)
+						exists := files.IsFile(file)
 						if verbose {
 							formatString := "\t%v"
 							if exists {
