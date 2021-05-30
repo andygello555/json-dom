@@ -73,7 +73,7 @@ var (
 	BuiltinGetterError    = RuntimeError{-3, "An error has occurred when getting the value of a builtin variable"}
 	OverriddenBuiltin     = RuntimeError{-4, "The following builtin was overridden"}
 	ScriptError           = RuntimeError{-5, "The following script has caused an error"}
-	JsonPathError		  = RuntimeError{-6, "A JSON path could not be evaluated for the following reasons"}
+	JsonPathError		  = RuntimeError{-6, "A JSON path could not be evaluated for the following reason(s)"}
 )
 
 // Fill out a RuntimeError error with the given extra info.
@@ -98,11 +98,15 @@ func (e *RuntimeError) FillError(extraInfo ...string) error {
 }
 
 // Fill out a RuntimeError error with the given list of errors.
+//
+// For all errors with the same code and message the code and message will be removed from that error before being
+// appended to the returned error. This stops situations where you have:
+//  (-6) A JSON path could not be evaluated for the following reasons: ..., (-6) A JSON path could not be evaluated for the following reasons: ...
 func (e *RuntimeError) FillFromErrors(errs []error) error {
 	// Create an array of the error messages so that they can be re-wrapped into another RuntimeError
 	errString := make([]string, len(errs))
-	for _, e := range errs {
-		errString = append(errString, e.Error())
+	for errNo, err := range errs {
+		errString[errNo] = strings.Replace(err.Error(), fmt.Sprintf("(%d) %s: ", e.code, e.message), "", -1)
 	}
 	return e.FillError(errString...)
 }

@@ -15,11 +15,10 @@ import (
 	"github.com/andygello555/gotils/slices"
 	str "github.com/andygello555/gotils/strings"
 	"github.com/andygello555/json-dom/code"
-	"github.com/andygello555/json-dom/jom/json_map"
 	"github.com/andygello555/json-dom/globals"
+	"github.com/andygello555/json-dom/jom/json_map"
 	"github.com/hjson/hjson-go"
 	"github.com/robertkrimen/otto"
-	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -512,7 +511,7 @@ func pathFinder(path []json_map.AbsolutePathKey, jsonMap map[string]interface{},
 				currValue = recursiveLookup(key, m)
 				break
 			default:
-				err = globals.JsonPathError.FillError(fmt.Sprintf("AbsolutePathKey of type: %v is unrecognised", key.KeyType))
+				err = globals.JsonPathError.FillError(fmt.Sprintf("AbsolutePathKey of type: %v is unrecognised for type \"%s\"", key.KeyType, str.TypeName(currValue)))
 				break
 			}
 		case []interface{}:
@@ -611,11 +610,11 @@ func pathFinder(path []json_map.AbsolutePathKey, jsonMap map[string]interface{},
 				currValue = recursiveLookup(key, arr)
 				break
 			default:
-				err = globals.JsonPathError.FillError(fmt.Sprintf("AbsolutePathKey of type: %v is unrecognised", key.KeyType))
+				err = globals.JsonPathError.FillError(fmt.Sprintf("AbsolutePathKey of type: %v is unrecognised for type \"%s\"", key.KeyType, str.TypeName(currValue)))
 				break
 			}
 		default:
-			err = globals.JsonPathError.FillError(fmt.Sprintf("Cannot access key %v of type %s", key, reflect.TypeOf(currValue).Name()))
+			err = globals.JsonPathError.FillError(fmt.Sprintf("Cannot access key %v of type \"%s\"", key, str.TypeName(currValue)))
 			break
 		}
 	}
@@ -736,7 +735,7 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 						newValue = recursiveTraversal(remainingPath, obj.([]interface{})[index.(int)])
 					default:
 						// Otherwise we cannot continue down the tree any further
-						panic(recursionError{fmt.Sprintf("Cannot recurse down subtree of type \"%s\"", reflect.TypeOf(obj).Name())})
+						panic(recursionError{fmt.Sprintf("Cannot recurse down subtree of type \"%s\"", str.TypeName(obj))})
 					}
 					return newValue
 				}
@@ -903,7 +902,7 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 					m = recursiveLookup(key, m).(map[string]interface{})
 					remainingPath = []json_map.AbsolutePathKey{}
 				default:
-					panic(recursionError{fmt.Sprintf("AbsolutePathKey of type: %v is unrecognised", key.KeyType)})
+					panic(recursionError{fmt.Sprintf("AbsolutePathKey of type: %v is unrecognised for type \"%s\"", key.KeyType, str.TypeName(currTree))})
 				}
 				// Finally set the current tree to the copy of the value as a map
 				currTree = m
@@ -993,12 +992,12 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 					arr = recursiveLookup(key, arr).([]interface{})
 					remainingPath = []json_map.AbsolutePathKey{}
 				default:
-					panic(recursionError{fmt.Sprintf("AbsolutePathKey of type: %v is unrecognised", key.KeyType)})
+					panic(recursionError{fmt.Sprintf("AbsolutePathKey of type: %v is unrecognised for type \"%s\"", key.KeyType, str.TypeName(currTree))})
 				}
 				// Current tree set to the modified array
 				currTree = arr
 			default:
-				panic(recursionError{fmt.Sprintf("Cannot access key %v within type %s", key, reflect.TypeOf(currTree).Name())})
+				panic(recursionError{fmt.Sprintf("Cannot access key %v within type \"%s\"", key, str.TypeName(currTree))})
 			}
 		}
 		return currTree
@@ -1015,7 +1014,8 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 					// If the caught error is of type recursionError (defined above) then we want to wrap into an error
 					switch caught.(type) {
 					case recursionError:
-						err = errors.New(caught.(recursionError).Message)
+						// Here we fill out the JsonPathError from the recursionError
+						err = globals.JsonPathError.FillError(caught.(recursionError).Message)
 					default:
 						// Another error that we should panic for
 						panic(caught)
@@ -1035,7 +1035,7 @@ func (jsonMap *JsonMap) SetAbsolutePaths(absolutePaths *json_map.AbsolutePaths, 
 				jsonMap.insides["array"] = newInsides.([]interface{})
 				jsonMap.Array = true
 			default:
-				err = errors.New(fmt.Sprintf("a JSON object cannot have a %s at its root", reflect.TypeOf(newInsides).Name()))
+				err = errors.New(fmt.Sprintf("a JSON object cannot have a \"%s\" at its root", str.TypeName(newInsides)))
 			}
 		}()
 
@@ -1544,4 +1544,9 @@ func (jsonMap *JsonMap) String() string {
 		panic(err)
 	}
 	return string(out)
+}
+
+// Checks whether the JsonMap is an array at its root.
+func (jsonMap *JsonMap) IsArray() bool {
+	return jsonMap.Array
 }

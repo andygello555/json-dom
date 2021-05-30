@@ -347,7 +347,7 @@ func TestExamples(t *testing.T) {
 					tt.Run(example.name, func(ttt *testing.T) {
 						// Some tests test for appropriate panics so we will need to defer a function call to catch them
 						shouldPanic := panicExampleNames[example.name]
-						if shouldPanic && !markupsAvailable || exampleNo < len(markups) && exampleNo >= 0 && len(markups[exampleNo]) != 0 {
+						if shouldPanic && (!markupsAvailable || exampleNo < len(markups) && exampleNo >= 0 && len(markups[exampleNo]) != 0) {
 							defer func() {
 								if p := recover(); p != nil {
 									switch example.name {
@@ -360,8 +360,10 @@ func TestExamples(t *testing.T) {
 											ttt.Errorf("Unsupported lang example panics but it is not a UnsupportedScriptLang error: %v", p)
 										}
 									}
-									return
+								} else {
+									ttt.Errorf("%s does not panic", ttt.Name())
 								}
+								return
 							}()
 						}
 
@@ -394,7 +396,7 @@ func TestExamples(t *testing.T) {
 								for headerTypeKey, headerType := range buffers {
 									for _, header := range printHeaders[headerTypeKey] {
 										if !strings.Contains(headerType.String(), header) {
-											fmt.Println(headerType.String())
+											//fmt.Println(headerType.String())
 											ttt.Errorf("%s for '%s' does not contain the following print header: \"%s\"", headerTypeKey, example.name, header)
 										}
 									}

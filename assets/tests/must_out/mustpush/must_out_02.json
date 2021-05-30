@@ -1,0 +1,30 @@
+{
+  "hello": "world",
+  "people": [
+    {
+      "name": "Sarah",
+      "age": 41
+    },
+    {
+      "name": "Sarah",
+      "age": 41
+    },
+    {
+      "name": "Jeff",
+      "age": 20
+    },
+    {
+      "name": "Bob",
+      "age": 24
+    },
+    {
+      "name": "Tim",
+      "age": 38
+    },
+    null,
+    {
+      "name": "Sarah",
+      "age": 41
+    }
+  ]
+}

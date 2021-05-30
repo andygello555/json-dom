@@ -1,0 +1,13 @@
+{
+  "hello": "world",
+  "people": [
+    {
+      "name": "Bob",
+      "age": 24
+    },
+    {
+      "name": "Tim",
+      "age": 38
+    }
+  ]
+}

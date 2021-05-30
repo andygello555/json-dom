@@ -1,5 +1,7 @@
 // Contains all the types/functions to do with running scripts/callbacks as well as a map of all the SupportedLang(s).
 //
+// These are mostly internally used functions and types and due to its imports.
+//
 // How it works
 //
 // When calling json_map.JsonMapInt.FindScriptFields, each script/callback will be replaced by a value of Code type in

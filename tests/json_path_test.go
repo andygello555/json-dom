@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/andygello555/gotils/maps"
+	"github.com/andygello555/gotils/slices"
 	"github.com/andygello555/json-dom/jom"
 	"github.com/andygello555/json-dom/jom/json_map"
 	"github.com/andygello555/json-dom/globals"
@@ -258,32 +259,6 @@ var exampleSetAbsolutePathInput = []setAbsolutePathExample{
 
 var exampleSetAbsolutePathOutput []interface{}
 
-func sameInterfaceSlice(x, y []interface{}) bool {
-	if len(x) != len(y) {
-		return false
-	}
-	// create a map of string -> int
-	diff := make(map[string]int, len(x))
-	for _, _x := range x {
-		// 0 value for int is 0, so just increment a counter for the value
-		diff[fmt.Sprint(_x)]++
-	}
-	for _, _y := range y {
-		// If the string _y is not in diff bail out early
-		if _, ok := diff[fmt.Sprint(_y)]; !ok {
-			return false
-		}
-		diff[fmt.Sprint(_y)] -= 1
-		if diff[fmt.Sprint(_y)] == 0 {
-			delete(diff, fmt.Sprint(_y))
-		}
-	}
-	if len(diff) == 0 {
-		return true
-	}
-	return false
-}
-
 func init() {
 	// Unmarshal the exampleBytes into a JsonMap and set exampleMap as its insides
 	example = jom.New()
@@ -486,7 +461,7 @@ func TestAbsolutePath(t *testing.T) {
 			nodeVals = append(nodeVals, node.Value)
 		}
 		// Check if the values returned by GetAbsolutePaths is equal to the expected values
-		if !sameInterfaceSlice(nodeVals, exampleAbsolutePathOutput[i]) {
+		if !slices.SameElements(nodeVals, exampleAbsolutePathOutput[i]) {
 			t.Errorf("%v and %v are not equal (absolute path: %v)", nodeVals, exampleAbsolutePathOutput[i], absolutePath)
 		}
 	}
@@ -507,7 +482,7 @@ func TestJsonPathSelector(t *testing.T) {
 			nodeVals = append(nodeVals, node.Value)
 		}
 		// Use reflect.DeepEqual to check equality between expected and array of nodeVals
-		if !sameInterfaceSlice(nodeVals, exampleJsonPathOutput[i]) {
+		if !slices.SameElements(nodeVals, exampleJsonPathOutput[i]) {
 			t.Errorf("%v and %v are not equal (JSON path: %s)", nodeVals, exampleJsonPathOutput[i], jsonPath)
 		}
 	}

@@ -33,13 +33,24 @@ func init() {
 func RunCallback(code code.Code, jsonMap json_map.JsonMapInt) (data json_map.JsonMapInt, err error) {
 	// Get the callback from the code object
 	callback := code.Script.(func(json json_map.JsonMapInt))
-	interrupt := make(chan bool)
+	interrupts := make(chan func() bool)
 
-	// Construct a wrapper around the callback which will write to the interrupt channel once finished
+	// Construct a wrapper around the callback which will write to the interrupts channel once finished
 	callbackSafe := func() {
 		defer func() {
-			// If we have finished then we will signal to everyone that we have
-			interrupt <- true
+			// Here we catch any panics that may have happened in the callback and add them to the interrupts channel
+			// so they will re-panic in the outer scope
+			if caught := recover(); caught != nil {
+				interrupts <- func() bool {
+					panic(caught)
+				}
+			} else {
+				// Otherwise we have finished then we will signal to everyone that we have using an interrupt which
+				// returns true
+				interrupts <- func() bool {
+					return true
+				}
+			}
 		}()
 		callback(jsonMap)
 	}
@@ -63,17 +74,22 @@ func RunCallback(code code.Code, jsonMap json_map.JsonMapInt) (data json_map.Jso
 		}
 	}()
 
-	// Start the timer which will also write to the interrupt channel to indicate that we are finished
+	// Start the timer which will also write to the interrupts channel to indicate that we are finished
 	go func() {
 		time.Sleep(time.Duration(globals.HaltingDelay) * globals.HaltingDelayUnits)
-		interrupt <- true
+		// Push an interrupts that will panic with the HaltingProblem global
+		interrupts <- func() bool {
+			panic(globals.HaltingProblem)
+		}
 	}()
 
 	go callbackSafe()
-	// We keep looping until we have read from the interrupt which signals us that the callback is done
+	// We keep looping until we have read from the interrupts which signals us that the callback is done
 	for {
-		_, ok := <- interrupt
-		if ok {
+		interrupt, ok := <-interrupts
+		// We execute the interrupt which will either return true or panic in the main thread of execution to be
+		// caught by the defer above which will fill out the HaltingProblem error.
+		if ok && interrupt() {
 			break
 		}
 	}

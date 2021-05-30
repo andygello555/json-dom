@@ -16,16 +16,6 @@ type SupportedLang struct {
 
 // All the scripting languages currently supported.
 var supportedLangs = make(map[string]*SupportedLang)
-//var supportedLangs = map[string]*SupportedLang {
-//	"js": {
-//		shebangName: "js",
-//		runCode:     js.RunScript,
-//	},
-//	"go": {
-//		shebangName: "go",
-//		runCode:     _go.RunCallback,
-//	},
-//}
 
 // Checks if the given script language suffix is a supported language.
 //

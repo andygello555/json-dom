@@ -16,6 +16,8 @@ type JsonMapInt interface {
 	GetInsides() *map[string]interface{}
 	// Given the list of absolute paths for a JsonMap, will return the list of values that said paths lead to.
 	GetAbsolutePaths(absolutePaths *AbsolutePaths) (values []*JsonPathNode, errs []error)
+	// Checks whether the JsonMap is an array at its root.
+	IsArray() bool
 	// Given a valid JSON path will return the list of pointers to json_map.JsonPathNode(s) that satisfies the JSON path.
 	JsonPathSelector(jsonPath string) (out []*JsonPathNode, err error)
 	// Given a valid JSON path: will set the values pointed to by the JSON path to be the value given.

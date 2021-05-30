@@ -1,0 +1,17 @@
+{
+  "hello": "me",
+  "people": [
+    {
+      "name": "Jeff",
+      "age": 20
+    },
+    {
+      "name": "Bob",
+      "age": 24
+    },
+    {
+      "name": "Tim",
+      "age": 38
+    }
+  ]
+}
